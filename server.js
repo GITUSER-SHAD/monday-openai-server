@@ -57,10 +57,22 @@ app.post("/webhook", async (req, res) => {
         messages: [
           {
             role: "user",
-            content:
-              `Rewrite/summarize this Monday item into a professional, actionable note.\n\n` +
-              `Item: ${itemName}\n\n` +
-              `Return 3 bullets + 1 short summary sentence.`,
+            content: `You are assisting a roofing, waterproofing, and building envelope consultant.
+
+Review the Monday item title below and write a practical project note.
+
+Item:
+${itemName}
+
+Return:
+- 3 concise action bullets
+- 1 short summary sentence
+
+Requirements:
+- Use professional construction and consulting language
+- Focus on next actions, field verification, scope, coordination, or documentation
+- Do not invent facts not implied by the item title
+- Keep the response brief`
           },
         ],
       },
