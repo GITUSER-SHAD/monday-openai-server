@@ -5,89 +5,60 @@ const axios = require("axios");
 const app = express();
 app.use(express.json());
 
-// Simple health check
 app.get("/", (req, res) => res.send("OK"));
 app.get("/webhook", (req, res) => res.send("WEBHOOK OK"));
 
 app.post("/webhook", async (req, res) => {
-  // Monday verification handshake
   if (req.body && req.body.challenge) {
     return res.json({ challenge: req.body.challenge });
   }
 
-  // Acknowledge immediately
   res.status(200).send("OK");
 
   try {
     const event = req.body?.event;
-    if (!event) {
-      console.log("No event payload:", req.body);
-      return;
-    }
+    if (!event) return;
 
     const itemId = event.pulseId || event.itemId;
-    if (!itemId) {
-      console.log("No itemId/pulseId found:", req.body);
-      return;
-    }
+    if (!itemId) return;
 
-    // 1) Read item name from Monday
     const mondayResp = await axios.post(
       "https://api.monday.com/v2",
       {
-        query: `
-          query {
-            items(ids: ${itemId}) {
-              id
-              name
-            }
-          }
-        `,
+        query: `query { items(ids: ${itemId}) { name } }`,
       },
       { headers: { Authorization: process.env.MONDAY_API_KEY } }
     );
 
-    const itemName = mondayResp.data?.data?.items?.[0]?.name || "(no name)";
+    const itemName = mondayResp.data?.data?.items?.[0]?.name || "Untitled";
 
-    // 2) Ask OpenAI
     const openaiResp = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4o-mini",
         messages: [
           {
-            role: "user",
-            content: `You are assisting a roofing, waterproofing, and building envelope consultant.
+            role: "system",
+            content: `You are a helpful assistant for a roofing and building envelope consultant.
 
-Review the Monday item title below and write a practical project note.
+Turn the following voice note title into:
+- A short professional summary (1-2 sentences)
+- 3 clear, actionable next steps
 
-Item:
-${itemName}
-
-Return:
-- 3 concise action bullets
-- 1 short summary sentence
-
-Requirements:
-- Use professional construction and consulting language
-- Focus on next actions, field verification, scope, coordination, or documentation
-- Do not invent facts not implied by the item title
-- Keep the response brief`
+Keep it concise and practical.`
           },
-        ],
+          {
+            role: "user",
+            content: itemName
+          }
+        ]
       },
       { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
     );
 
-    const aiText = openaiResp.data?.choices?.[0]?.message?.content || "";
+    const aiText = openaiResp.data.choices[0].message.content;
+    const safeBody = aiText.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
 
-    // Escape for Monday GraphQL string
-    const safeBody = aiText
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n");
-
-    // 3) Post result back to Monday as an Update
     await axios.post(
       "https://api.monday.com/v2",
       {
@@ -95,14 +66,15 @@ Requirements:
           mutation {
             create_update(item_id: ${itemId}, body: "${safeBody}") { id }
           }
-        `,
+        `
       },
       { headers: { Authorization: process.env.MONDAY_API_KEY } }
     );
 
-    console.log(`Posted AI update to item ${itemId}`);
+    console.log(`✅ Phase 1 update posted for item ${itemId}`);
+
   } catch (err) {
-    console.error("Webhook processing error:", err?.response?.data || err.message);
+    console.error("Error:", err?.response?.data || err.message);
   }
 });
 
