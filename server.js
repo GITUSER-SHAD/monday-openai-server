@@ -16,14 +16,28 @@ app.post("/webhook", async (req, res) => {
 
   try {
     const itemName = req.body.itemName || req.body.title || "Untitled from Plaud";
+    console.log("Creating item in ClickUp:", itemName);
 
-    console.log("Item Name:", itemName);
+    // Create item in ClickUp
+    await axios.post(
+      "https://api.clickup.com/api/v2/list/6-901416156788-1/task",
+      {
+        name: itemName,
+        description: req.body.transcript || "",
+        priority: 3, // Medium
+        status: "New"
+      },
+      {
+        headers: {
+          Authorization: process.env.CLICKUP_API_KEY
+        }
+      }
+    );
 
-    // TODO: Add ClickUp creation logic here later
-
+    console.log("✅ Item created in ClickUp");
     console.log("=== END ===");
   } catch (err) {
-    console.error("ERROR:", err.message);
+    console.error("ERROR:", err.response?.data || err.message);
   }
 });
 
