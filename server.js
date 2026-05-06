@@ -10,31 +10,32 @@ app.get("/webhook", (req, res) => res.send("WEBHOOK OK"));
 
 app.post("/webhook", async (req, res) => {
   console.log("=== WEBHOOK RECEIVED ===");
-  console.log("Body:", JSON.stringify(req.body, null, 2));
 
   res.status(200).send("OK");
 
   try {
-    const itemName = req.body.itemName || req.body.title || "Untitled from Plaud";
-    console.log("Creating item in ClickUp:", itemName);
-
-    // Create item in ClickUp
+    const body = req.body;
+    
+    // Better title extraction from Plaud
+    const title = body.title || body.itemName || body.transcript?.substring(0, 80) + "..." || "New Plaud Note";
+    
+    // Create rich item in ClickUp
     await axios.post(
       "https://api.clickup.com/api/v2/list/901416156788/task",
       {
-  name: itemName,
-  description: req.body.transcript || "",
-  priority: 3
-},
+        name: title,
+        description: body.transcript || body.summary || "",
+        priority: 3,
+        custom_fields: [
+          { id: "SOURCE", value: "Plaud" }
+        ]
+      },
       {
-        headers: {
-          Authorization: process.env.CLICKUP_API_KEY
-        }
+        headers: { Authorization: process.env.CLICKUP_API_KEY }
       }
     );
 
-    console.log("✅ Item created in ClickUp");
-    console.log("=== END ===");
+    console.log("✅ Item created:", title);
   } catch (err) {
     console.error("ERROR:", err.response?.data || err.message);
   }
