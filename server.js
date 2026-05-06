@@ -20,7 +20,7 @@ app.post("/webhook", async (req, res) => {
 
     // Create item in ClickUp
     await axios.post(
-      "https://api.clickup.com/api/v2/list/6-901416156788-1/task",
+      "https://api.clickup.com/api/v2/list/901416156788/task",
       {
         name: itemName,
         description: req.body.transcript || "",
