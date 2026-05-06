@@ -16,19 +16,16 @@ app.post("/webhook", async (req, res) => {
   try {
     const body = req.body;
     
-    // Better title extraction from Plaud
+    // Better title extraction
     const title = body.title || body.itemName || body.transcript?.substring(0, 80) + "..." || "New Plaud Note";
     
-    // Create rich item in ClickUp
+    // Create item in ClickUp
     await axios.post(
       "https://api.clickup.com/api/v2/list/901416156788/task",
       {
         name: title,
         description: body.transcript || body.summary || "",
-        priority: 3,
-        custom_fields: [
-          { id: "SOURCE", value: "Plaud" }
-        ]
+        priority: 3
       },
       {
         headers: { Authorization: process.env.CLICKUP_API_KEY }
@@ -36,6 +33,7 @@ app.post("/webhook", async (req, res) => {
     );
 
     console.log("✅ Item created:", title);
+    console.log("=== END ===");
   } catch (err) {
     console.error("ERROR:", err.response?.data || err.message);
   }
