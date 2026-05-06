@@ -20,7 +20,7 @@ app.post("/webhook", async (req, res) => {
     const grokResponse = await axios.post(
       "https://api.x.ai/v1/chat/completions",
       {
-        model: "grok-2-1212",
+        model: model: "grok-2",
         messages: [
           {
             role: "system",
