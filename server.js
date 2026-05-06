@@ -22,11 +22,10 @@ app.post("/webhook", async (req, res) => {
     await axios.post(
       "https://api.clickup.com/api/v2/list/901416156788/task",
       {
-        name: itemName,
-        description: req.body.transcript || "",
-        priority: 3, // Medium
-        status: "New"
-      },
+  name: itemName,
+  description: req.body.transcript || "",
+  priority: 3
+},
       {
         headers: {
           Authorization: process.env.CLICKUP_API_KEY
