@@ -10,25 +10,28 @@ app.get("/webhook", (req, res) => res.send("WEBHOOK OK"));
 
 app.post("/webhook", async (req, res) => {
   console.log("=== WEBHOOK RECEIVED ===");
-  console.log("Body:", JSON.stringify(req.body, null, 2));
 
   res.status(200).send("OK");
 
   try {
     const body = req.body;
     
-    // Better title extraction
-    const title = body.title || 
-              body.itemName || 
-              (body.transcript && body.transcript.length > 10 ? body.transcript.substring(0, 80) + "..." : null) || 
-              "New Plaud Note";
-    
+    // Extract title from Plaud's long string format
+    let rawText = Object.values(body)[0] || "";
+    let title = "New Plaud Note";
+
+    if (rawText.includes("Title:")) {
+      title = rawText.split("Title:")[1].split("\n")[0].trim();
+    } else if (rawText.length > 10) {
+      title = rawText.substring(0, 80) + "...";
+    }
+
     // Create item in ClickUp
     await axios.post(
       "https://api.clickup.com/api/v2/list/901416156788/task",
       {
         name: title,
-        description: body.transcript || body.summary || "",
+        description: rawText,
         priority: 3
       },
       {
