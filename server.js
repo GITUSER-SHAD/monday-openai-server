@@ -17,7 +17,10 @@ app.post("/webhook", async (req, res) => {
     const body = req.body;
     
     // Better title extraction
-    const title = body.title || body.itemName || body.transcript?.substring(0, 80) + "..." || "New Plaud Note";
+    const title = body.title || 
+              body.itemName || 
+              (body.transcript && body.transcript.length > 10 ? body.transcript.substring(0, 80) + "..." : null) || 
+              "New Plaud Note";
     
     // Create item in ClickUp
     await axios.post(
