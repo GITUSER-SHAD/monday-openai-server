@@ -1,0 +1,482 @@
+# SYNTHETIC FIXTURE DATA - invented for pipeline testing. Not real filings, people, securities or prices.
+filer_name,chamber,owner_code,trade_date,disclosure_date,ticker,asset_name,asset_type_hint,transaction_type,amount_range_text,sector,source,source_url
+Synthetic Member Alpha,senate,SELF,2019-03-27,2019-05-20,ZZII,[SYNTHETIC] ZZII Put Options,Options,Purchase,"$1,000,001 - $5,000,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2019-04-26,2019-05-22,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2019-07-09,2019-08-09,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2019-07-15,2019-07-22,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Sale (Full),"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2019-09-18,2019-10-09,ZZCC,[SYNTHETIC] ZZCC Put Options,Options,Purchase,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2019-11-28,2020-07-29,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2020-01-28,2020-03-17,ZZEE,[SYNTHETIC] ZZEE Exchange Traded Fund,ETF,Purchase,"over $50,000,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2020-03-03,2020-04-21,ZZFF,[SYNTHETIC] ZZFF Call Options,Options,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2020-04-01,2020-05-19,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Purchase,"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2020-06-12,2020-07-09,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2020-07-10,2021-04-16,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$100,001 - $250,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2020-07-16,2020-07-24,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2020-08-28,2020-10-28,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2020-09-17,2020-11-03,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2020-09-24,2020-11-13,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Sale (Full),"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2020-10-05,2020-12-04,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2020-11-05,2020-11-19,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2020-11-12,2020-12-22,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2021-03-05,2021-04-15,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$250,001 - $500,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2021-04-30,2021-06-29,ZZHH,[SYNTHETIC] ZZHH Put Options,Options,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2021-06-08,2021-08-05,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2021-07-30,2021-09-20,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2021-08-20,2021-09-03,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2021-09-14,2021-10-01,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-02-10,2022-03-28,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Partial),"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2022-02-22,2022-03-21,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Sale (Full),"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2022-04-11,2022-05-13,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-05-03,2022-05-13,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-05-04,2022-06-24,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2022-06-10,2022-06-28,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2022-06-16,2022-07-12,ZZFF,[SYNTHETIC] ZZFF Put Options,Options,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-06-22,2022-07-18,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2022-06-27,2022-08-22,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2022-07-29,2022-09-06,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$100,001 - $250,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-09-14,2022-10-05,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2022-10-07,2023-04-19,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2022-10-25,2022-11-18,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2022-12-15,2023-01-20,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Sale (Full),"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2023-02-10,2023-09-28,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2023-02-23,2023-04-24,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2023-06-13,2023-10-25,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2023-06-23,2023-08-14,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2023-09-13,2024-12-02,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2023-10-04,2023-11-23,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2023-11-29,2023-12-13,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Sale (Partial),"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2024-01-25,2024-02-09,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-02-09,2024-03-06,ZZII,[SYNTHETIC] ZZII Put Options,Options,Purchase,"$100,001 - $250,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-02-16,2024-04-05,ZZEE,[SYNTHETIC] ZZEE Put Options,Options,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2024-02-23,2024-04-03,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2024-02-26,2024-08-21,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-02-29,2024-03-12,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-03-26,2024-07-05,ZZII,[SYNTHETIC] ZZII Call Options,Options,Purchase,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2024-04-17,2024-05-31,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2024-04-26,2024-05-08,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-05-21,2024-10-01,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$100,001 - $250,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2024-05-22,2024-07-04,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,JT,2024-05-29,2024-06-17,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-07-01,2024-08-08,ZZCC,[SYNTHETIC] ZZCC Put Options,Options,Sale (Full),"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2024-07-09,2024-08-06,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$500,001 - $1,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-07-17,2024-11-26,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SELF,2024-08-02,2024-08-21,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2024-08-15,2024-08-21,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,SP,2024-08-19,2024-09-06,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Alpha,senate,DC,2024-11-15,2024-12-20,ZZII,[SYNTHETIC] ZZII Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-05-06,2019-05-17,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2019-05-08,2019-06-20,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"over $50,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-05-22,2019-05-28,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-08-01,2019-09-16,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-08-07,2019-08-15,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-08-12,2019-09-12,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-09-11,2019-12-17,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2019-09-20,2020-07-14,ZZDD,[SYNTHETIC] ZZDD Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-10-02,2019-11-25,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Sale (Partial),"$100,001 - $250,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2019-11-08,2019-11-14,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2019-11-28,2019-12-13,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,JT,2020-02-07,2020-03-11,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2020-02-10,2020-03-27,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2020-02-14,2020-03-23,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-02-26,2020-04-23,ZZBB,[SYNTHETIC] ZZBB Exchange Traded Fund,ETF,Purchase,"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-03-03,2020-03-25,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-05-07,2020-06-24,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2020-08-11,2020-09-11,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-09-17,2020-10-16,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$500,001 - $1,000,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-09-21,2020-11-04,ZZAA,[SYNTHETIC] ZZAA Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2020-10-28,2021-02-08,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2021-03-19,2021-04-07,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$500,001 - $1,000,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2021-04-14,2021-04-30,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2021-05-11,2021-06-08,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2021-06-11,2021-07-27,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2021-10-26,2021-11-10,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,000,001 - $5,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2022-01-17,2022-02-25,ZZEE,[SYNTHETIC] ZZEE Put Options,Options,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2022-02-03,2022-02-22,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2022-02-04,2022-03-03,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2022-02-09,2022-03-08,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2022-05-16,2022-06-20,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,JT,2022-06-28,2022-07-19,ZZII,[SYNTHETIC] ZZII Call Options,Options,Purchase,"$100,001 - $250,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2022-07-29,2022-09-22,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2022-08-04,2022-08-15,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2022-08-11,2022-09-28,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,JT,2022-09-07,2022-10-26,ZZCC,[SYNTHETIC] ZZCC Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2022-11-15,2023-01-13,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$500,001 - $1,000,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2022-11-18,2022-12-22,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2022-12-29,2023-02-07,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,JT,2023-01-18,2023-03-21,ZZII,[SYNTHETIC] ZZII Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2023-02-01,2023-02-10,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2023-02-28,2023-03-22,ZZFF,[SYNTHETIC] ZZFF Common Stock - short sale,Stock,Sale,"$250,001 - $500,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2023-03-24,2024-02-02,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$100,001 - $250,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2023-04-18,2023-06-01,ZZHH,[SYNTHETIC] ZZHH Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2023-05-10,2023-07-07,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Full),"$1,000,001 - $5,000,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2023-05-15,2024-01-02,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2023-06-27,2023-06-30,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2023-07-28,2023-08-07,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2023-12-25,2023-12-28,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$250,001 - $500,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2024-03-05,2024-03-14,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SP,2024-03-19,2024-04-18,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$500,001 - $1,000,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2024-03-29,2024-05-10,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Sale (Full),"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2024-08-01,2024-08-19,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2024-09-26,2024-11-15,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$50,001 - $100,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2024-10-02,2024-11-13,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,DC,2024-10-02,2024-12-31,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Bravo,house,SELF,2024-10-28,2024-12-24,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Sale (Full),"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2019-03-28,2019-04-30,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2019-04-18,2019-05-28,ZZII,[SYNTHETIC] ZZII Put Options,Options,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2019-05-09,2019-07-04,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2019-05-27,2019-06-24,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2019-08-21,2019-08-30,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2019-10-23,2019-11-15,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Purchase,"$100,001 - $250,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2019-10-25,2019-11-25,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2019-11-05,2019-12-17,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2020-01-02,2020-01-29,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2020-01-07,2020-12-14,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2020-02-20,2020-03-02,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2020-03-06,2020-03-12,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2020-03-26,2020-05-21,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2020-04-01,2020-04-08,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,000,001 - $5,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2020-04-28,2021-05-17,ZZGG,[SYNTHETIC] ZZGG Common Stock - short sale,Stock,Sale,"$250,001 - $500,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2020-05-13,2020-08-18,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2020-06-11,2020-08-04,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2020-09-29,2020-11-06,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2020-10-07,2020-10-12,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2021-01-07,2021-05-04,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,000,001 - $5,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2021-02-24,2021-05-27,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2021-03-02,2021-04-09,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2021-05-07,2021-06-18,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2021-05-12,2021-06-18,ZZGG,[SYNTHETIC] ZZGG Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2021-05-21,2021-06-17,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$500,001 - $1,000,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2021-05-27,2021-06-04,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2021-09-23,2021-10-19,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2021-10-13,2021-10-19,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2021-11-16,2022-09-21,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Purchase,"$250,001 - $500,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2022-02-08,2022-02-24,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2022-02-15,2022-04-06,ZZAA,[SYNTHETIC] ZZAA Call Options,Options,Purchase,"$250,001 - $500,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2022-02-25,2022-03-16,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2022-03-07,2022-03-31,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2022-04-14,2022-06-03,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2022-05-25,2022-06-08,ZZHH,[SYNTHETIC] ZZHH Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2022-09-27,2022-10-19,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2022-11-03,2023-01-02,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$100,001 - $250,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2023-03-28,2023-04-06,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2023-04-25,2023-06-19,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"over $50,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2023-05-01,2023-05-18,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2023-05-16,2023-09-21,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2023-06-02,2023-07-17,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2023-06-12,2023-07-25,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2023-06-21,2023-11-22,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2023-06-26,2023-07-13,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2023-07-21,2023-09-06,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2023-09-01,2023-09-07,ZZFF,[SYNTHETIC] ZZFF Call Options,Options,Purchase,"$500,001 - $1,000,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2023-09-06,2023-10-09,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2023-09-21,2024-08-30,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2023-11-03,2024-01-02,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2023-11-14,2023-12-07,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2023-12-05,2024-01-12,ZZHH,[SYNTHETIC] ZZHH Put Options,Options,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2024-02-27,2024-03-08,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2024-03-14,2024-05-06,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Partial),"$500,001 - $1,000,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2024-04-12,2024-12-31,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Sale (Full),"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2024-05-30,2024-06-21,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2024-06-24,2024-07-15,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2024-07-16,2024-07-24,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2024-07-24,2024-07-30,ZZJJ,[SYNTHETIC] ZZJJ Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SELF,2024-09-03,2024-09-10,ZZDD,[SYNTHETIC] ZZDD Put Options,Options,Purchase,"$500,001 - $1,000,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,SP,2024-09-05,2024-10-25,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,JT,2024-09-23,2024-09-30,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Charlie,house,DC,2024-11-07,2024-12-02,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Sale (Partial),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2019-05-03,2019-05-27,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2019-06-24,2019-08-20,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2019-07-10,2019-09-11,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2019-07-15,2019-12-10,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2019-08-14,2019-12-16,ZZJJ,[SYNTHETIC] ZZJJ Exchange Traded Fund,ETF,Purchase,"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2019-09-27,2019-11-04,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2019-10-01,2019-10-29,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,DC,2019-10-14,2019-11-22,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2019-10-22,2019-10-29,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$100,001 - $250,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2019-11-04,2019-12-18,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2020-03-18,2021-05-13,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Purchase,"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-04-15,2020-05-04,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2020-04-28,2020-06-16,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Sale (Full),"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-04-30,2020-05-22,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-05-11,2020-07-07,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2020-05-29,2020-06-26,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2020-07-13,2020-08-06,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$100,001 - $250,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2020-07-23,2020-09-17,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-07-29,2020-08-03,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2020-08-03,2020-09-25,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2020-09-08,2020-09-18,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2020-11-20,2021-01-20,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-12-21,2021-02-16,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2020-12-23,2021-01-06,ZZII,[SYNTHETIC] ZZII Put Options,Options,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2021-01-08,2021-02-26,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Purchase,"$100,001 - $250,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2021-02-22,2021-04-06,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2021-03-03,2021-04-06,ZZJJ,[SYNTHETIC] ZZJJ Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2021-03-11,2021-04-02,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2021-12-01,2021-12-10,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2021-12-15,2021-12-27,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2021-12-23,2022-01-25,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Sale (Partial),"$500,001 - $1,000,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,DC,2022-01-14,2022-02-28,ZZII,[SYNTHETIC] ZZII Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,DC,2022-02-14,2022-02-18,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Sale (Full),"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2022-04-15,2022-05-20,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2022-05-20,2022-07-08,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2022-06-03,2022-07-01,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2022-06-23,2022-08-08,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2022-08-16,2022-09-06,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,DC,2022-10-12,2022-10-20,ZZDD,[SYNTHETIC] ZZDD Put Options,Options,Purchase,"$250,001 - $500,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2023-01-24,2023-03-21,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Sale (Full),"$250,001 - $500,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-01-25,2023-02-03,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-01-26,2023-02-01,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-03-21,2023-04-17,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-04-06,2024-03-12,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2023-04-26,2023-05-15,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$500,001 - $1,000,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2023-05-03,2023-05-09,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-05-23,2023-06-15,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$100,001 - $250,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-06-21,2023-08-14,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"over $50,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-08-02,2023-08-16,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Full),"$100,001 - $250,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-08-10,2023-08-22,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"over $50,000,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2023-08-16,2023-10-13,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-10-26,2023-12-01,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$100,001 - $250,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2023-11-24,2024-01-19,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,000,001 - $5,000,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2023-12-08,2024-12-31,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SP,2024-01-01,2024-01-11,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-02-05,2024-02-23,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-04-25,2024-06-05,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2024-07-17,2024-08-28,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$250,001 - $500,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-07-22,2024-08-14,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,000,001 - $5,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-08-14,2024-08-28,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,JT,2024-08-15,2024-08-23,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Sale (Partial),"$250,001 - $500,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-08-16,2024-12-31,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Delta,senate,SELF,2024-10-04,2024-11-13,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2019-05-02,2019-05-20,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2019-07-24,2019-09-17,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2019-08-05,2019-08-19,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,000,001 - $5,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2019-08-14,2019-08-22,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2019-08-21,2019-10-22,ZZHH,[SYNTHETIC] ZZHH Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2019-08-23,2019-08-28,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2020-01-14,2020-02-13,ZZJJ,[SYNTHETIC] ZZJJ Exchange Traded Fund,ETF,Sale (Full),"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2020-03-17,2020-04-15,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2020-03-31,2020-05-26,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2020-04-23,2020-05-26,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2020-04-29,2020-06-25,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2020-05-21,2020-06-29,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2020-07-08,2020-08-19,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2020-09-21,2021-05-24,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2020-09-25,2020-11-20,ZZJJ,[SYNTHETIC] ZZJJ Exchange Traded Fund,ETF,Sale (Partial),"$50,001 - $100,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2021-01-07,2021-05-03,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$500,001 - $1,000,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-02-12,2021-03-01,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-03-26,2021-04-07,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-04-06,2021-05-17,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-04-15,2021-05-25,ZZBB,[SYNTHETIC] ZZBB Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2021-07-09,2021-08-27,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$500,001 - $1,000,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2021-10-01,2022-06-03,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2021-10-12,2022-11-11,ZZJJ,[SYNTHETIC] ZZJJ Common Stock - short sale,Stock,Sale,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-11-03,2021-12-07,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2021-11-08,2021-11-12,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-11-19,2021-12-06,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2021-11-26,2022-01-10,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-01-11,2022-01-20,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Sale (Full),"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-01-14,2022-03-10,ZZAA,[SYNTHETIC] ZZAA Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2022-03-04,2022-04-06,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,000,001 - $5,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-04-05,2022-05-16,ZZJJ,[SYNTHETIC] ZZJJ Put Options,Options,Purchase,"$15,001 - $50,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2022-04-25,2022-05-06,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Purchase,"over $50,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2022-05-10,2022-06-17,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2022-06-20,2022-08-19,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-06-22,2022-06-27,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-07-04,2022-08-01,ZZCC,[SYNTHETIC] ZZCC Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2022-07-18,2022-08-29,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2022-07-26,2023-04-27,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2022-10-03,2022-11-23,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Purchase,"$100,001 - $250,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2022-12-30,2023-02-21,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2023-01-06,2023-03-08,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2023-01-26,2023-02-15,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2023-02-27,2023-03-30,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-03-09,2023-07-07,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2023-04-18,2023-04-24,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2023-06-06,2023-07-24,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$250,001 - $500,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2023-06-26,2023-07-18,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2023-07-17,2023-08-29,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-08-07,2023-12-14,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-08-15,2023-09-06,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-08-23,2023-09-26,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2023-09-04,2023-11-01,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-09-26,2023-10-26,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2023-10-05,2024-03-18,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Sale (Full),"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2023-10-19,2023-12-08,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-10-20,2023-11-02,ZZDD,[SYNTHETIC] ZZDD Exchange Traded Fund,ETF,Sale (Full),"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2023-11-06,2023-11-24,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Full),"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2024-02-07,2024-02-20,ZZFF,[SYNTHETIC] ZZFF Put Options,Options,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2024-04-05,2024-10-29,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2024-04-12,2024-05-03,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2024-04-17,2024-06-13,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2024-05-31,2024-08-01,ZZEE,[SYNTHETIC] ZZEE Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2024-06-06,2024-06-20,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$250,001 - $500,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2024-06-10,2024-08-08,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SP,2024-06-11,2024-08-02,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2024-06-12,2024-07-24,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2024-06-21,2024-08-16,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,JT,2024-07-01,2024-08-14,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,DC,2024-08-01,2024-09-20,ZZBB,[SYNTHETIC] ZZBB Exchange Traded Fund,ETF,Sale (Full),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Echo,house,SELF,2024-11-01,2024-11-25,ZZBB,[SYNTHETIC] ZZBB Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2019-05-31,2020-02-17,ZZAA,[SYNTHETIC] ZZAA Call Options,Options,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2019-06-18,2019-07-02,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2019-07-22,2019-10-15,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2019-08-13,2019-08-27,ZZCC,[SYNTHETIC] ZZCC Put Options,Options,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2019-09-26,2019-11-18,ZZHH,[SYNTHETIC] ZZHH Call Options,Options,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2020-06-23,2020-07-01,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2020-08-17,2020-10-01,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2020-08-20,2020-09-07,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2020-10-30,2021-04-06,ZZCC,[SYNTHETIC] ZZCC Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2020-11-16,2020-11-27,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2021-02-15,2021-02-26,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2021-05-18,2021-05-21,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$250,001 - $500,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2021-06-01,2021-06-17,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2021-07-22,2021-09-13,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,DC,2021-08-10,2021-10-01,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Purchase,"$250,001 - $500,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2021-10-22,2021-11-02,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2022-01-24,2022-03-04,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2022-04-11,2022-10-26,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Sale (Partial),"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2022-05-05,2022-06-28,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,000,001 - $5,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2022-06-20,2022-08-11,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2022-07-18,2022-08-31,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2022-08-09,2022-08-22,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2023-01-20,2023-05-30,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2023-03-27,2023-05-26,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2023-05-23,2023-07-20,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Sale (Full),"$100,001 - $250,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2023-06-08,2023-08-09,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2023-08-17,2023-10-13,ZZBB,[SYNTHETIC] ZZBB Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2023-09-05,2023-10-06,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2023-10-26,2023-11-29,ZZFF,[SYNTHETIC] ZZFF Call Options,Options,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2023-11-24,2023-11-29,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Partial),"$1,000,001 - $5,000,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2024-01-05,2024-01-22,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2024-02-09,2024-03-19,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"over $50,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2024-02-13,2024-04-08,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2024-03-05,2024-03-29,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2024-04-10,2024-05-29,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2024-05-14,2024-12-31,ZZDD,[SYNTHETIC] ZZDD Put Options,Options,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2024-05-21,2024-05-29,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2024-08-21,2024-10-10,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SELF,2024-08-28,2024-10-07,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,SP,2024-09-25,2024-11-20,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Purchase,"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,DC,2024-10-04,2024-12-31,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Sale (Full),"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2024-10-14,2024-12-04,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$250,001 - $500,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Foxtrot,house,JT,2024-10-28,2024-12-05,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2019-07-03,2019-08-02,ZZEE,[SYNTHETIC] ZZEE Exchange Traded Fund,ETF,Purchase,"$1,000,001 - $5,000,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2019-07-16,2019-08-08,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2019-08-01,2019-08-22,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2019-09-09,2019-10-14,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$500,001 - $1,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2019-09-19,2019-10-24,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2019-11-14,2020-01-06,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2019-12-30,2021-01-18,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$100,001 - $250,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2020-01-30,2021-04-13,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2020-02-13,2020-03-09,ZZGG,[SYNTHETIC] ZZGG Call Options,Options,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2020-02-27,2021-03-05,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2020-04-07,2020-05-01,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2020-05-04,2020-05-07,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2020-07-09,2021-04-06,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2020-10-12,2020-11-24,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$500,001 - $1,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2020-12-09,2021-02-09,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2021-01-18,2021-02-02,ZZJJ,[SYNTHETIC] ZZJJ Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2021-02-22,2021-02-25,ZZHH,[SYNTHETIC] ZZHH Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2021-06-10,2021-07-01,ZZHH,[SYNTHETIC] ZZHH Exchange Traded Fund,ETF,Purchase,"$250,001 - $500,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2021-08-19,2021-09-20,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2021-09-09,2021-10-28,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$100,001 - $250,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2021-10-25,2021-12-10,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Sale (Full),"$50,001 - $100,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2022-01-19,2022-02-21,ZZAA,[SYNTHETIC] ZZAA Call Options,Options,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2022-01-24,2022-02-15,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2022-01-25,2022-03-22,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2022-03-04,2022-05-03,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2022-05-03,2022-06-24,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2022-05-17,2022-05-27,ZZGG,[SYNTHETIC] ZZGG Put Options,Options,Purchase,"$50,001 - $100,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2022-06-03,2022-07-01,ZZFF,[SYNTHETIC] ZZFF Call Options,Options,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2022-06-20,2022-07-08,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2022-10-19,2022-11-29,ZZBB,[SYNTHETIC] ZZBB Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2022-11-15,2022-11-21,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2022-11-17,2022-12-22,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2022-11-18,2022-12-05,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2022-12-01,2023-01-09,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Sale (Full),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2023-04-28,2023-06-13,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$500,001 - $1,000,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2023-07-11,2023-08-29,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Partial),"$50,001 - $100,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2023-08-16,2023-09-20,ZZDD,[SYNTHETIC] ZZDD Call Options,Options,Purchase,"$1,001 - $15,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2023-09-22,2023-10-19,ZZBB,[SYNTHETIC] ZZBB Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2023-12-07,2024-01-29,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Purchase,"$500,001 - $1,000,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2023-12-19,2024-01-18,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2023-12-21,2024-01-16,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2024-02-09,2024-04-08,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Sale (Full),"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2024-04-11,2024-04-30,ZZCC,[SYNTHETIC] ZZCC Exchange Traded Fund,ETF,Purchase,"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2024-06-12,2024-08-08,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$100,001 - $250,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SP,2024-06-18,2024-08-12,ZZFF,[SYNTHETIC] ZZFF Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2024-06-21,2024-08-12,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$15,001 - $50,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2024-07-10,2024-09-02,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2024-08-05,2024-09-27,ZZJJ,[SYNTHETIC] ZZJJ Exchange Traded Fund,ETF,Sale (Full),"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2024-08-07,2024-09-24,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2024-08-15,2024-11-07,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,JT,2024-08-22,2024-09-09,ZZAA,[SYNTHETIC] ZZAA Exchange Traded Fund,ETF,Sale (Partial),"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2024-09-23,2024-11-15,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,DC,2024-10-14,2024-10-29,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Golf,senate,SELF,2024-11-04,2024-12-03,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$100,001 - $250,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-03-27,2020-04-08,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-06-14,2019-06-20,ZZCC,[SYNTHETIC] ZZCC Common Stock - short sale,Stock,Sale,"$500,001 - $1,000,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-08-12,2019-09-10,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"over $50,000,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-09-10,2019-09-20,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$250,001 - $500,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-11-11,2020-08-04,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-11-19,2019-11-29,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Sale (Full),"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2019-12-05,2019-12-23,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2019-12-13,2020-02-06,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2019-12-24,2020-01-23,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2019-12-26,2020-01-09,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"over $50,000,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2020-02-05,2020-02-10,ZZCC,[SYNTHETIC] ZZCC Put Options,Options,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2020-02-07,2020-02-28,ZZAA,[SYNTHETIC] ZZAA Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2020-02-17,2020-03-30,ZZGG,[SYNTHETIC] ZZGG Common Stock - short sale,Stock,Sale,"$100,001 - $250,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2020-02-21,2020-04-06,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2020-03-31,2020-05-11,ZZAA,[SYNTHETIC] ZZAA Call Options,Options,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2020-04-16,2020-05-26,ZZCC,[SYNTHETIC] ZZCC Call Options,Options,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2020-04-28,2020-05-20,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$15,001 - $50,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2020-06-05,2020-06-17,ZZJJ,[SYNTHETIC] ZZJJ Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2020-06-29,2020-07-20,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2020-07-13,2021-07-20,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$50,001 - $100,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2020-08-11,2020-08-27,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Full),"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2020-10-23,2020-12-24,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2021-01-11,2021-06-17,ZZDD,[SYNTHETIC] ZZDD Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2021-01-12,2021-03-05,ZZEE,[SYNTHETIC] ZZEE Call Options,Options,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2021-03-19,2021-05-14,ZZFF,[SYNTHETIC] ZZFF Exchange Traded Fund,ETF,Sale (Full),"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2021-03-25,2021-05-05,ZZII,[SYNTHETIC] ZZII Common Stock,Stock,Sale (Full),"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2021-03-30,2021-05-21,ZZAA,[SYNTHETIC] ZZAA Common Stock - short sale,Stock,Purchase,"$50,001 - $100,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2021-05-07,2021-06-03,ZZCC,[SYNTHETIC] ZZCC Put Options,Options,Purchase,"$15,001 - $50,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2021-05-17,2021-06-16,ZZEE,[SYNTHETIC] ZZEE Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2021-05-26,2021-07-13,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2021-06-15,2021-07-14,ZZII,[SYNTHETIC] ZZII Call Options,Options,Purchase,"$1,001 - $15,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2021-08-25,2021-10-25,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2021-09-01,2021-10-19,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$1,001 - $15,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2022-03-23,2023-04-06,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$1,001 - $15,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2022-06-07,2022-08-04,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Purchase,"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2022-06-13,2022-08-12,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2022-06-28,2022-08-29,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$250,001 - $500,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2022-08-26,2022-09-12,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Sale,"$50,001 - $100,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2022-09-08,2022-09-15,ZZAA,[SYNTHETIC] ZZAA Common Stock - short sale,Stock,Sale,"$500,001 - $1,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2022-12-13,2023-01-02,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Purchase,"$15,001 - $50,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2023-01-03,2023-03-01,ZZJJ,[SYNTHETIC] ZZJJ Call Options,Options,Purchase,"$50,001 - $100,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2023-01-25,2023-03-14,ZZII,[SYNTHETIC] ZZII Put Options,Options,Purchase,"$100,001 - $250,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-03-08,2023-04-07,ZZAA,[SYNTHETIC] ZZAA Common Stock,Stock,Purchase,"$1,001 - $15,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-03-14,2023-04-03,ZZJJ,[SYNTHETIC] ZZJJ Common Stock - short sale,Stock,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-03-15,2023-10-05,ZZBB,[SYNTHETIC] ZZBB Common Stock - short sale,Stock,Sale,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2023-03-31,2023-05-16,ZZBB,[SYNTHETIC] ZZBB Put Options,Options,Purchase,"$250,001 - $500,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2023-05-02,2023-05-26,ZZAA,[SYNTHETIC] ZZAA Put Options,Options,Purchase,"$500,001 - $1,000,000",energy,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2023-06-08,2023-07-20,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Purchase,"$1,001 - $15,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-06-20,2023-07-21,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2023-07-18,2023-09-01,ZZHH,[SYNTHETIC] ZZHH Common Stock,Stock,Purchase,"$1,001 - $15,000",utilities,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-08-10,2023-09-20,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$500,001 - $1,000,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2023-10-09,2023-11-28,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Sale (Full),"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2023-12-11,2024-01-19,ZZGG,[SYNTHETIC] ZZGG Common Stock,Stock,Sale (Full),"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-01-17,2024-08-12,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Purchase,"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-02-15,2024-04-02,ZZFF,[SYNTHETIC] ZZFF Common Stock,Stock,Sale (Partial),"$15,001 - $50,000",gold_mining,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2024-03-07,2024-05-08,ZZDD,[SYNTHETIC] ZZDD Common Stock,Stock,Sale (Full),"$1,000,001 - $5,000,000",financials,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-04-05,2024-05-07,ZZGG,[SYNTHETIC] ZZGG Exchange Traded Fund,ETF,Purchase,"$15,001 - $50,000",semiconductors,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-05-30,2024-12-31,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Purchase,"$250,001 - $500,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2024-06-13,2024-06-19,ZZII,[SYNTHETIC] ZZII Exchange Traded Fund,ETF,Purchase,"$250,001 - $500,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2024-07-22,2024-08-02,ZZBB,[SYNTHETIC] ZZBB Common Stock,Stock,Sale (Full),"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2024-08-26,2024-10-22,ZZCC,[SYNTHETIC] ZZCC Common Stock,Stock,Purchase,"$1,001 - $15,000",technology,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-09-18,2024-11-01,ZZBB,[SYNTHETIC] ZZBB Call Options,Options,Sale (Partial),"$15,001 - $50,000",defense,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,JT,2024-10-09,2024-11-07,ZZII,[SYNTHETIC] ZZII Common Stock - short sale,Stock,Sale,"$15,001 - $50,000",consumer_discretionary,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SELF,2024-11-13,2024-12-27,ZZJJ,[SYNTHETIC] ZZJJ Common Stock,Stock,Sale (Full),"$50,001 - $100,000",real_estate,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,SP,2024-11-15,2024-12-04,ZZEE,[SYNTHETIC] ZZEE Common Stock - short sale,Stock,Purchase,"$15,001 - $50,000",health_care,synthetic-fixture,fixtures/make_fixture.py
+Synthetic Member Hotel,house,DC,2024-11-18,2024-12-31,ZZEE,[SYNTHETIC] ZZEE Common Stock,Stock,Sale (Partial),"$1,001 - $15,000",health_care,synthetic-fixture,fixtures/make_fixture.py

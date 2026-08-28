@@ -1,0 +1,32 @@
+# SYNTHETIC FIXTURE DATA - invented for pipeline testing. Not real filings, people, securities or prices.
+event_id,date,category,sectors,description,source,source_url
+SYN-EV-016,2019-07-16,legislation,energy|utilities,[SYNTHETIC] Synthetic energy tax-credit package passes,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-009,2019-10-07,impeachment,broad_market,[SYNTHETIC] Synthetic impeachment proceeding opens,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-021,2019-10-14,war,defense|aerospace|energy,[SYNTHETIC] Synthetic escalation in a regional conflict,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-001,2019-10-30,war,defense|aerospace|energy,[SYNTHETIC] Synthetic escalation in a regional conflict,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-015,2020-02-24,scandal,financials,[SYNTHETIC] Synthetic accounting restatement at a large issuer,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-002,2020-03-18,legislation,health_care|pharmaceuticals,[SYNTHETIC] Synthetic drug-pricing bill reported out of committee,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-010,2020-04-29,exec_death,technology,[SYNTHETIC] Synthetic sudden CEO succession,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-029,2020-05-14,impeachment,broad_market,[SYNTHETIC] Synthetic impeachment proceeding opens,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-030,2020-07-14,exec_death,technology,[SYNTHETIC] Synthetic sudden CEO succession,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-028,2020-09-03,trial,consumer_discretionary,[SYNTHETIC] Synthetic antitrust verdict,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-017,2020-11-09,sector_news,gold_mining|gold,[SYNTHETIC] Synthetic reserve-purchase announcement,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-024,2021-03-01,sector_news,semiconductors|technology,[SYNTHETIC] Synthetic export-control rule published,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-022,2021-03-24,legislation,health_care|pharmaceuticals,[SYNTHETIC] Synthetic drug-pricing bill reported out of committee,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-027,2021-06-09,sector_news,gold_mining|gold,[SYNTHETIC] Synthetic reserve-purchase announcement,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-003,2021-11-15,fed_action,financials|banks|real_estate,[SYNTHETIC] Synthetic policy-rate decision,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-019,2021-12-31,impeachment,broad_market,[SYNTHETIC] Synthetic impeachment proceeding opens,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-008,2022-08-23,trial,consumer_discretionary,[SYNTHETIC] Synthetic antitrust verdict,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-007,2023-04-06,sector_news,gold_mining|gold,[SYNTHETIC] Synthetic reserve-purchase announcement,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-026,2023-06-09,legislation,energy|utilities,[SYNTHETIC] Synthetic energy tax-credit package passes,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-011,2023-06-14,war,defense|aerospace|energy,[SYNTHETIC] Synthetic escalation in a regional conflict,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-012,2023-08-31,legislation,health_care|pharmaceuticals,[SYNTHETIC] Synthetic drug-pricing bill reported out of committee,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-025,2023-09-11,scandal,financials,[SYNTHETIC] Synthetic accounting restatement at a large issuer,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-004,2023-09-22,sector_news,semiconductors|technology,[SYNTHETIC] Synthetic export-control rule published,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-023,2023-10-13,fed_action,financials|banks|real_estate,[SYNTHETIC] Synthetic policy-rate decision,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-006,2024-03-27,legislation,energy|utilities,[SYNTHETIC] Synthetic energy tax-credit package passes,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-013,2024-04-15,fed_action,financials|banks|real_estate,[SYNTHETIC] Synthetic policy-rate decision,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-014,2024-07-12,sector_news,semiconductors|technology,[SYNTHETIC] Synthetic export-control rule published,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-020,2024-07-24,exec_death,technology,[SYNTHETIC] Synthetic sudden CEO succession,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-005,2024-09-26,scandal,financials,[SYNTHETIC] Synthetic accounting restatement at a large issuer,synthetic-fixture,fixtures/make_fixture.py
+SYN-EV-018,2024-10-08,trial,consumer_discretionary,[SYNTHETIC] Synthetic antitrust verdict,synthetic-fixture,fixtures/make_fixture.py

@@ -1,0 +1,11 @@
+# Core analysis stack
+pandas>=2.0
+duckdb>=0.10
+pyyaml>=6.0
+
+# Data acquisition (optional at runtime; each is guarded by a fallback chain)
+requests>=2.31
+yfinance>=0.2.40        # primary price source
+lxml>=4.9               # House Clerk PTR index parsing
+beautifulsoup4>=4.12    # Senate EFD HTML parsing
+pdfplumber>=0.10        # House PTR PDF extraction (last-resort source)

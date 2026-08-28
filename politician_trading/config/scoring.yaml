@@ -1,0 +1,37 @@
+# Composite ranking score — stated here and echoed verbatim into every report
+# so the number is auditable. Raw components are always reported alongside it.
+#
+#   score = 0.4*mean_alpha_vs_spy
+#         + 0.3*win_rate
+#         + 0.2*median_alpha_vs_sector
+#         + 0.1*event_proximity_rate
+#
+# UNITS WARNING (documented in README, surfaced in the report):
+# mean/median alpha are RETURN FRACTIONS (0.08 = +8pp) while win_rate and
+# event_proximity_rate are RATES in [0,1]. Summing them weights a percentage
+# point of alpha very differently from a percentage point of win rate. The
+# formula below is the one specified for this project and is the default; a
+# rank-normalised variant (each component -> its percentile within the eligible
+# cohort, then the same weights) is computed alongside it as
+# `composite_score_normalized`. Both are reported. Neither is a measure of skill
+# or of wrongdoing.
+
+formula: "0.4*mean_alpha_vs_spy + 0.3*win_rate + 0.2*median_alpha_vs_sector_etf + 0.1*event_proximity_rate"
+
+weights:
+  mean_alpha_vs_spy: 0.4
+  win_rate: 0.3
+  median_alpha_vs_sector_etf: 0.2
+  event_proximity_rate: 0.1
+
+# Ranking eligibility. A 100% win rate over 2 trades is noise, not performance.
+min_trades_for_ranking: 5
+
+# "top 100 trades each" — which 100 of a person's trades feed their metrics.
+#   largest       : 100 highest estimated notional (midpoint of disclosed range)
+#   most_recent   : 100 most recent by trade date
+top_trades_per_person: 100
+top_trades_selection: largest
+
+# Number of people in the final ranked report.
+report_top_n: 150

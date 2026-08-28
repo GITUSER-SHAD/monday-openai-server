@@ -1,0 +1,5 @@
+# Generated at runtime — rebuild with `python3 -m ptrack all`
+out/*.duckdb
+out/sector_cache.csv
+__pycache__/
+*.pyc

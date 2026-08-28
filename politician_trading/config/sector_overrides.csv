@@ -1,0 +1,11 @@
+# Manual ticker -> sector assignments. Applied AFTER the automatic sector
+# resolver and BEFORE the default fallback, so a row here always wins.
+# Sector values must be keys in config/benchmarks.yaml `sectors`.
+ticker,sector,note
+LMT,defense,prime defense contractor
+RTX,defense,prime defense contractor
+NOC,defense,prime defense contractor
+GD,defense,prime defense contractor
+BA,aerospace,commercial + defense aerospace
+NEM,gold_mining,gold miner
+GOLD,gold_mining,gold miner

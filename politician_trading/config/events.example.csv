@@ -1,0 +1,2 @@
+event_id,date,category,sectors,description,source,source_url
+EV-EXAMPLE-001,2020-02-20,sector_news,broad_market,"EXAMPLE ROW — replace with curated events. Schema demo only.",curated,https://example.invalid/

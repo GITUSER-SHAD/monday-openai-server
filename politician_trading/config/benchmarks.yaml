@@ -1,0 +1,35 @@
+# Sector -> benchmark ETF mapping used for the "alpha vs sector ETF" metric.
+# market_benchmark is used for the "alpha vs SPY" metric.
+#
+# Every trade is benchmarked over the IDENTICAL window as the position it
+# belongs to (same open date, same close date). A trade whose sector cannot be
+# resolved falls back to `default_sector_etf` and is flagged
+# sector_benchmark_is_fallback = true in trade_metrics.
+
+market_benchmark: SPY
+default_sector_etf: SPY   # flagged as a fallback wherever it is used
+
+sectors:
+  energy:                 XLE
+  financials:             XLF
+  banks:                  KBE
+  technology:             XLK
+  semiconductors:         SOXX
+  communication_services: XLC
+  health_care:            XLV
+  biotech:                XBI
+  pharmaceuticals:        XPH
+  industrials:            XLI
+  defense:                ITA
+  aerospace:              ITA
+  transportation:         IYT
+  consumer_discretionary: XLY
+  consumer_staples:       XLP
+  utilities:              XLU
+  real_estate:            XLRE
+  materials:              XLB
+  gold_mining:            GDX
+  gold:                   GLD
+  metals_mining:          XME
+  crypto:                 BITQ
+  broad_market:           SPY
