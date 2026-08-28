@@ -50,6 +50,7 @@ class Config:
     # Benchmarking convention for short/put positions. See README.
     short_benchmark_mode: str = "long_benchmark"
     event_window_trading_days: int = 10
+
     config_dir: Path = field(default=CONFIG_DIR)
 
     def sector_etf_for(self, sector: str | None) -> tuple[str, bool]:
@@ -108,6 +109,8 @@ def load_config(config_dir: Path | str = CONFIG_DIR) -> Config:
         top_trades_per_person=int(scoring.get("top_trades_per_person", 100)),
         top_trades_selection=scoring.get("top_trades_selection", "largest"),
         report_top_n=int(scoring.get("report_top_n", 150)),
+        short_benchmark_mode=bench.get("short_benchmark_mode", "long_benchmark"),
+        event_window_trading_days=int(scoring.get("event_window_trading_days", 10)),
         config_dir=config_dir,
     )
 

@@ -35,3 +35,7 @@ top_trades_selection: largest
 
 # Number of people in the final ranked report.
 report_top_n: 150
+
+# Event proximity: flag a position opened within this many TRADING days before
+# a sector-matched event. Weekends and market holidays do not count.
+event_window_trading_days: 10

@@ -1,6 +1,6 @@
 # Public-Disclosure Trading Analysis — Ranked Report
 
-**Run:** `run-20260828T061548-2c0abd`  
+**Run:** `run-20260828T080210-a2b54b`  
 **Prices as of:** 2024-12-31  
 **People ranked:** top 150 by composite score (minimum 5 analysed positions to be eligible)
 
@@ -31,7 +31,7 @@ Raw components are shown for every person so the score can be recomputed by hand
 |---|---|---|
 | Trades / disclosures | synthetic-fixture | fixtures/make_fixture.py |
 | Daily prices (adj. close) | local_csv:synthetic_prices.csv | synthetic_prices.csv |
-| Officials roster | congress-legislators | https://github.com/unitedstates/congress-legislators |
+| Officials roster | none (no roster matched) | n/a |
 | Event timeline | synthetic-fixture | fixtures/make_fixture.py |
 
 ## Methodology settings

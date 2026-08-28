@@ -9,6 +9,14 @@
 market_benchmark: SPY
 default_sector_etf: SPY   # flagged as a fallback wherever it is used
 
+# How a short or put position is benchmarked:
+#   long_benchmark : alpha = position_return - benchmark_return, i.e. "versus
+#                    simply holding the index over the same days". Asymmetric
+#                    for shorts by construction, and documented as such.
+#   sign_matched   : the benchmark takes the position's own sign, so a short is
+#                    compared against shorting the index.
+short_benchmark_mode: long_benchmark
+
 sectors:
   energy:                 XLE
   financials:             XLF

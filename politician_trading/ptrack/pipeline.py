@@ -107,6 +107,7 @@ def ingest(con, cfg: Config, run_id: str, *, events_csv: Path | None = None,
         trade_outcome.result.data, roster_df, cfg,
         source=trade_outcome.result.source,
         source_url=trade_outcome.result.source_url,
+        roster_source=roster_outcome.result.source if roster_outcome.ok else None,
     )
     for note in notes:
         logger("WARN", note, "ingest:normalize")
@@ -213,7 +214,8 @@ def _earliest_trade_date(trades_df: pd.DataFrame) -> date:
 
 
 def build_people_and_trades(raw: pd.DataFrame, roster: pd.DataFrame, cfg: Config,
-                            source: str, source_url: str
+                            source: str, source_url: str,
+                            roster_source: str | None = None
                             ) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """Normalise raw disclosure rows into the `people` and `trades` schemas."""
     notes: list[str] = []
@@ -238,7 +240,7 @@ def build_people_and_trades(raw: pd.DataFrame, roster: pd.DataFrame, cfg: Config
 
         member_id = _ensure_person(
             people, member_slug, filer, "self", None, member_meta,
-            raw_row.get("chamber"), source, source_url)
+            raw_row.get("chamber"), source, source_url, roster_source)
 
         owner_raw = str(raw_row.get("owner_code") or "").strip().lower()
         relation = OWNER_RELATION.get(owner_raw, "other_relative" if owner_raw else "self")
@@ -249,7 +251,8 @@ def build_people_and_trades(raw: pd.DataFrame, roster: pd.DataFrame, cfg: Config
             _ensure_person(
                 people, person_id,
                 f"{filer} ({relation.replace('_', ' ')})", relation, member_id,
-                member_meta, raw_row.get("chamber"), source, source_url)
+                member_meta, raw_row.get("chamber"), source, source_url,
+                roster_source)
 
         trade_date = normalize.parse_date(raw_row.get("trade_date"))
         disclosure_date = normalize.parse_date(raw_row.get("disclosure_date"))
@@ -313,7 +316,8 @@ def build_people_and_trades(raw: pd.DataFrame, roster: pd.DataFrame, cfg: Config
 
 def _ensure_person(people: dict, person_id: str, full_name: str, relation: str,
                    official_person_id: str | None, meta: dict | None,
-                   chamber_hint, source: str, source_url: str) -> str:
+                   chamber_hint, source: str, source_url: str,
+                   roster_source: str | None = None) -> str:
     if person_id not in people:
         meta = meta or {}
         people[person_id] = {
@@ -329,7 +333,8 @@ def _ensure_person(people: dict, person_id: str, full_name: str, relation: str,
             "district": meta.get("district"),
             "term_start": normalize.parse_date(meta.get("term_start")),
             "term_end": normalize.parse_date(meta.get("term_end")),
-            "source": source if not meta else f"{source}+congress-legislators",
+            "source": source if not meta else f"{source}+{roster_source or 'roster'}",
+            "roster_source": roster_source if meta else None,
             "source_url": source_url,
             "ingested_at": datetime.now(),
         }
@@ -426,6 +431,15 @@ def _price_source_url(source: str | None) -> str:
     }.get(source, source)
 
 
+def _roster_source_url(source: str | None) -> str:
+    """Map a stored roster-source label back to a citable location."""
+    if not source:
+        return "n/a"
+    return {
+        "congress-legislators": roster_src.REPO_URL,
+    }.get(source, source)
+
+
 def build_report(con, cfg: Config, run_id: str, out_dir: Path,
                  as_of: date | None = None) -> dict[str, Path]:
     person_metrics = con.execute("SELECT * FROM person_metrics").df()
@@ -441,6 +455,10 @@ def build_report(con, cfg: Config, run_id: str, out_dir: Path,
     ).fetchone()
     event_src = con.execute(
         "SELECT any_value(source), any_value(source_url) FROM events").fetchone()
+    roster_src_row = con.execute(
+        "SELECT roster_source, count(*) c FROM people "
+        "WHERE roster_source IS NOT NULL GROUP BY roster_source "
+        "ORDER BY c DESC LIMIT 1").fetchone()
 
     total_positions = len(trade_metrics)
     complete = int(trade_metrics["price_data_complete"].sum()) if total_positions else 0
@@ -467,8 +485,10 @@ def build_report(con, cfg: Config, run_id: str, out_dir: Path,
         trade_source_url=(trade_src[1] if trade_src else "n/a"),
         price_source=(price_src[0] if price_src else "none"),
         price_source_url=_price_source_url(price_src[0] if price_src else None),
-        roster_source="congress-legislators",
-        roster_source_url="https://github.com/unitedstates/congress-legislators",
+        roster_source=(roster_src_row[0] if roster_src_row and roster_src_row[0]
+                       else "none (no roster matched)"),
+        roster_source_url=_roster_source_url(
+            roster_src_row[0] if roster_src_row else None),
         event_source=(event_src[0] if event_src and event_src[0] else "none"),
         event_source_url=(event_src[1] if event_src and event_src[1] else "n/a"),
         weights=cfg.weights,

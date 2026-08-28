@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS people (
     term_start           DATE,
     term_end             DATE,
     source               TEXT NOT NULL,
+    roster_source        TEXT,     -- which roster actually supplied the metadata
     source_url           TEXT,
     ingested_at          TIMESTAMP DEFAULT now()
 );

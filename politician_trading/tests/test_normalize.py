@@ -115,5 +115,46 @@ class TestSectorResolution(unittest.TestCase):
         self.assertEqual(normalize.resolve_sector("ZZZZ", CFG, {}), (None, "fallback"))
 
 
+class TestConfigIsLoadedFromFiles(unittest.TestCase):
+    """Settings documented as configurable must actually come from config/.
+
+    These two were once dataclass defaults that no YAML could reach, so the
+    README described a knob that did not exist. This pins them to the files.
+    """
+
+    def test_shipped_config_supplies_the_documented_settings(self):
+        self.assertEqual(CFG.short_benchmark_mode, "long_benchmark")
+        self.assertEqual(CFG.event_window_trading_days, 10)
+
+    def test_values_come_from_yaml_not_from_code_defaults(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        from ptrack.config import CONFIG_DIR, load_config
+
+        tmp = Path(tempfile.mkdtemp(prefix="ptrack-cfg-"))
+        try:
+            for name in ("benchmarks.yaml", "amount_ranges.yaml", "scoring.yaml",
+                         "sector_overrides.csv"):
+                shutil.copy(CONFIG_DIR / name, tmp / name)
+
+            bench = (tmp / "benchmarks.yaml").read_text().replace(
+                "short_benchmark_mode: long_benchmark",
+                "short_benchmark_mode: sign_matched")
+            (tmp / "benchmarks.yaml").write_text(bench)
+
+            scoring = (tmp / "scoring.yaml").read_text().replace(
+                "event_window_trading_days: 10",
+                "event_window_trading_days: 3")
+            (tmp / "scoring.yaml").write_text(scoring)
+
+            edited = load_config(tmp)
+            self.assertEqual(edited.short_benchmark_mode, "sign_matched")
+            self.assertEqual(edited.event_window_trading_days, 3)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
