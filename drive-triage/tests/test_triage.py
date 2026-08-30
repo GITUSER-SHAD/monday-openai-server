@@ -381,6 +381,24 @@ class DRefWithoutHashesTest(unittest.TestCase):
                 os.path.join(out, "d-hash-request.csv")))
 
 
+class DRefHeaderStyleTest(unittest.TestCase):
+    def test_pascalcase_headers_recognized(self):
+        """PowerShell-exported inventories use PascalCase with no separators
+        (FullName/SizeBytes); these must map to path/size like snake_case."""
+        import logging
+        from triage.dupes import DReference
+        for header in ("FullName,SizeBytes", "full_name,size_bytes",
+                       "Full Name,Size Bytes", "PATH,LENGTH"):
+            with tempfile.TemporaryDirectory() as base:
+                p = os.path.join(base, "d.csv")
+                with open(p, "w", newline="", encoding="utf-8") as fh:
+                    fh.write(header + "\n")
+                    fh.write("D:\\Data\\a.jpg,102400\n")
+                ref = DReference.load(p, logging.getLogger("t"))
+                self.assertEqual(ref.row_count, 1, header)
+                self.assertTrue(ref.has_size(102400), header)
+
+
 class GuardTest(unittest.TestCase):
     def test_output_inside_scan_root_refused(self):
         with self.assertRaises(SystemExit):

@@ -15,8 +15,16 @@ echo.
 cd /d "%~dp0"
 python -m triage all --config triage-config.json --drive %DRIVE%:\
 echo.
-echo ============================================
-echo DONE. Reports are in C:\DEV\triage\reports\
-echo ============================================
+if errorlevel 1 (
+  echo ============================================
+  echo FAILED - see the error message above.
+  echo Nothing on %DRIVE%: was touched. Send this
+  echo window's text to Claude to fix it.
+  echo ============================================
+) else (
+  echo ============================================
+  echo DONE. Reports are in C:\DEV\triage\reports\
+  echo ============================================
+)
 echo.
 pause

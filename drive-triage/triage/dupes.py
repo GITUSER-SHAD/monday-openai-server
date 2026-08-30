@@ -27,11 +27,18 @@ _FULL_HASH_HEADERS = ("sha256", "full_sha256", "hash", "sha_256", "sha256sum",
 _PREFIX_HASH_HEADERS = ("prefix_sha256", "prefix_hash", "head_sha256")
 
 
+def _squash(s):
+    """Lowercase, alphanumerics only - so 'SizeBytes', 'size_bytes', and
+    'Size Bytes' all compare equal regardless of the source tool's naming
+    convention (PowerShell CSVs commonly use PascalCase with no separator)."""
+    return re.sub(r"[^a-z0-9]", "", s.strip().lower())
+
+
 def _match_header(headers, wanted):
-    lowered = {h.strip().lower().replace(" ", "_"): h for h in headers}
+    squashed = {_squash(h): h for h in headers}
     for w in wanted:
-        if w in lowered:
-            return lowered[w]
+        if _squash(w) in squashed:
+            return squashed[_squash(w)]
     return None
 
 
