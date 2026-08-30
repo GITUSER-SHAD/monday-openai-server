@@ -97,6 +97,11 @@ def build_drive_e(root):
            b"copynum-photo-" + bytes([48 + i]) * (10 + i), OLD)
     # loose file at drive root
     _w(root, "LooseClip.mov", b"loose-clip-at-root-bytes-000001", OLD)
+    # macOS volume metadata: junk regardless of its private extensions
+    _w(root, ".Spotlight-V100/Store-V2/ABC/0.indexHead", b"spotlight-idx", OLD)
+    _w(root, ".Spotlight-V100/VolumeConfiguration.plist", b"plist-data", OLD)
+    _w(root, ".fseventsd/00000000018a4e52", b"fsevent-log-data", OLD)
+    _w(root, ".dropbox.device", b"dropbox-marker", OLD)
 
 
 def build_drive_f(root):

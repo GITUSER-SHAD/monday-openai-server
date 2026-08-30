@@ -234,6 +234,16 @@ class PipelineTest(unittest.TestCase):
         self.assertNotIn(kept_copy["class"], ("JUNK", "DUPE_EXTERNAL"))
         self.assertIn("keeper", kept_copy["evidence"])
 
+    def test_os_metadata_is_junk_not_unknown(self):
+        for rel in (".Spotlight-V100/Store-V2/ABC/0.indexHead",
+                    ".Spotlight-V100/VolumeConfiguration.plist",
+                    ".fseventsd/00000000018a4e52"):
+            row = self.erow(rel)
+            self.assertEqual(row["class"], "JUNK", rel)
+            self.assertEqual(row["subclass"], "os-metadata", rel)
+        row = self.erow(".dropbox.device")
+        self.assertEqual(row["class"], "JUNK")
+
     def test_media_in_temp_dir_not_junk(self):
         row = self.erow("temp/real_footage.mov")
         self.assertEqual(row["class"], "MEDIA")

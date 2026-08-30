@@ -61,7 +61,18 @@ INSTALLER_DIRS = {"downloads", "installers", "drivers", "software", "setup",
 
 JUNK_NAMES = {"thumbs.db", ".ds_store", "desktop.ini", "iconcache.db",
               ".picasa.ini", "picasa.ini", "zbthumbnail.info",
-              "albumartsmall.jpg", "folder.jpg"}
+              "albumartsmall.jpg", "folder.jpg", ".dropbox", ".dropbox.device",
+              ".apdisk", ".volumeicon.icns", "autorun.inf"}
+
+# macOS/Windows volume metadata written by the OS, never user content:
+# search indexes, filesystem-event logs, trash and revision stores. These
+# regenerate on their own, so they are junk regardless of the odd file
+# extensions inside them (Spotlight stores use dozens of private ones).
+OS_METADATA_DIRS = {
+    ".spotlight-v100", ".fseventsd", ".trashes", ".temporaryitems",
+    ".documentrevisions-v100", ".mobilebackups", "__macosx",
+    "$recycle.bin", "found.000", "system volume information",
+}
 JUNK_EXT = {"tmp", "temp", "crdownload", "part", "partial", "dmp", "chk",
             "etl", "regtrans-ms", "blf"}
 # NOTE: no generic "packages" here - real user folders carry that name.
@@ -682,6 +693,11 @@ def _is_junk(parts, name, ext, size):
         return True, "temp", f"temp/office-lock filename pattern {name!r}"
     if ext in JUNK_EXT:
         return True, "temp", f"temporary-file extension .{ext}"
+    for seg in parts[:-1]:
+        if seg.casefold() in OS_METADATA_DIRS:
+            return True, "os-metadata", \
+                f"inside OS-generated metadata directory {seg!r} " \
+                f"(search index / event log / trash - regenerates itself)"
     for seg in parts[:-1]:
         if seg.casefold() in CACHE_DIRS:
             if ext in MEDIA_EXT or ext in DOC_EXT:
