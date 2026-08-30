@@ -22,7 +22,7 @@ from .util import (
     HASH_COLUMNS, PREFIX_BYTES, CsvAppender, drive_slug, extended_path,
     norm_key, read_csv_rows,
 )
-from .inventory import load_inventory
+from .inventory import iter_inventory
 
 _READ_CHUNK = 1024 * 1024
 
@@ -85,7 +85,7 @@ def collect_size_census(cfg, roots, dref, logger):
     """Counter of sizes across all external inventories + D reference."""
     census = Counter()
     for root in roots:
-        for row in load_inventory(cfg, root):
+        for row in iter_inventory(cfg, root):
             if row["error"] or not row["size"]:
                 continue
             size = int(row["size"])
@@ -103,7 +103,7 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
     done = _load_hashed(paths["prefix"])
     written = 0
     with CsvAppender(paths["prefix"], HASH_COLUMNS, flush_every=200) as out:
-        for row in load_inventory(cfg, root):
+        for row in iter_inventory(cfg, root):
             if row["error"] or not row["size"]:
                 continue
             size = int(row["size"])

@@ -188,17 +188,17 @@ def resolve_dupe_groups(files, dref):
     return d_dupes, ext_dupes, keepers
 
 
-def probable_d_matches(inventories, dref):
+def probable_d_matches(cfg, roots, dref, iter_rows):
     """size+basename matches vs a hash-less D: reference, over ALL files.
 
-    Only meaningful when the reference lacks full hashes; returns
-    norm_key -> d_reference_path.
+    `iter_rows(root)` streams inventory rows. Only meaningful when the
+    reference lacks full hashes; returns norm_key -> d_reference_path.
     """
     probable = {}
     if dref.has_full_hashes or not dref.row_count:
         return probable
-    for rows in inventories.values():
-        for row in rows:
+    for root in roots:
+        for row in iter_rows(root):
             if row["error"] or not row["size"]:
                 continue
             size = int(row["size"])

@@ -1,10 +1,12 @@
 """Phase 3: reports, master plan, move/copy manifests, decision list.
 
-Pure computation over classify CSVs. Nothing here reads target drives and
-nothing is ever executed against them - manifests are proposals for a later,
-separately-approved session.
+Pure computation over classify CSVs, all streaming - memory stays flat no
+matter how many millions of rows a drive has. Nothing here reads target
+drives and nothing is ever executed against them - manifests are proposals
+for a later, separately-approved session.
 """
 
+import heapq
 import os
 import re
 from collections import Counter, defaultdict
@@ -26,40 +28,48 @@ ACTION_BY_CLASS = {
 }
 
 
-def _load_classified(cfg, root):
-    return list(read_csv_rows(classify_paths(cfg, root), CLASSIFY_COLUMNS))
+def iter_classified(cfg, root):
+    yield from read_csv_rows(classify_paths(cfg, root), CLASSIFY_COLUMNS)
 
 
 def _size(row):
     return int(row["size"]) if row["size"] else 0
 
 
+def _top_component(root, path):
+    return re.split(r"[\\/]", os.path.relpath(path, root))[0]
+
+
 # ---------------------------------------------------------------------------
 # Deliverable 1: per-drive triage report
 # ---------------------------------------------------------------------------
 
-def per_drive_report(cfg, root, rows):
+def per_drive_report(cfg, root):
     slug = drive_slug(root)
     by_class = defaultdict(lambda: [0, 0])  # class -> [count, bytes]
     top_dirs_dupe = Counter()
     boxes = defaultdict(lambda: [0, 0])
     errors = 0
-    for r in rows:
-        c = r["class"]
+    biggest = []  # heap of (size, path, class)
+    for i, r in enumerate(iter_classified(cfg, root)):
+        c, sz = r["class"], _size(r)
         by_class[c][0] += 1
-        by_class[c][1] += _size(r)
+        by_class[c][1] += sz
         if c in ("EXACT_DUPE_OF_D", "DUPE_EXTERNAL"):
-            top = re.split(r"[\\/]", os.path.relpath(r["path"], root))[0]
-            top_dirs_dupe[top] += _size(r)
+            top_dirs_dupe[_top_component(root, r["path"])] += sz
         if c == "ARCHIVE_BOX":
             boxes[r["subclass"]][0] += 1
-            boxes[r["subclass"]][1] += _size(r)
+            boxes[r["subclass"]][1] += sz
         if r["subclass"] == "stat-error":
             errors += 1
+        item = (sz, i, r["path"], c)
+        if len(biggest) < 20:
+            heapq.heappush(biggest, item)
+        elif item > biggest[0]:
+            heapq.heapreplace(biggest, item)
 
     total_files = sum(v[0] for v in by_class.values())
     total_bytes = sum(v[1] for v in by_class.values())
-    biggest = sorted(rows, key=_size, reverse=True)[:20]
 
     lines = [
         f"# Triage report - drive {slug} ({root})",
@@ -89,8 +99,8 @@ def per_drive_report(cfg, root, rows):
             lines.append(f"- {d}: {fmt_gb(b)} duplicated")
         lines.append("")
     lines += ["## 20 largest files", ""]
-    for r in biggest:
-        lines.append(f"- {fmt_gb(_size(r)):>10}  [{r['class']}] {r['path']}")
+    for sz, _, path, c in sorted(biggest, reverse=True):
+        lines.append(f"- {fmt_gb(sz):>10}  [{c}] {path}")
     if errors:
         lines += ["", f"Unreadable/stat-error files: {errors} "
                       f"(see logs and classify CSV)"]
@@ -103,25 +113,26 @@ def per_drive_report(cfg, root, rows):
 # Deliverable 2: master consolidated plan
 # ---------------------------------------------------------------------------
 
-def master_plan(cfg, all_rows_by_root):
+def master_plan(cfg, roots):
     by_class = defaultdict(lambda: [0, 0])
     tier = defaultdict(lambda: [0, 0])
     tree = defaultdict(lambda: [0, 0])   # first two proposed-path levels
-    for root, rows in all_rows_by_root.items():
-        for r in rows:
+    for root in roots:
+        for r in iter_classified(cfg, root):
+            sz = _size(r)
             by_class[r["class"]][0] += 1
-            by_class[r["class"]][1] += _size(r)
+            by_class[r["class"]][1] += sz
             if r["nas_tier"] and r["nas_tier"] != "none":
                 tier[r["nas_tier"]][0] += 1
-                tier[r["nas_tier"]][1] += _size(r)
+                tier[r["nas_tier"]][1] += sz
             if r["proposed_path"]:
                 parts = r["proposed_path"].split("\\")
                 key = "\\".join(parts[:2])
                 tree[key][0] += 1
-                tree[key][1] += _size(r)
+                tree[key][1] += sz
 
     lines = ["# Master consolidated triage plan", "",
-             f"Drives: {', '.join(drive_slug(r) for r in all_rows_by_root)}",
+             f"Drives: {', '.join(drive_slug(r) for r in roots)}",
              "", "## Totals by class", "",
              "| Class | Files | Size |", "|---|---:|---:|"]
     for c in sorted(by_class, key=lambda c: -by_class[c][1]):
@@ -153,16 +164,16 @@ def master_plan(cfg, all_rows_by_root):
 # Deliverable 3: move/copy manifests (nothing executed this session)
 # ---------------------------------------------------------------------------
 
-def write_manifests(cfg, all_rows_by_root):
+def write_manifests(cfg, roots):
     outs = []
-    for root, rows in all_rows_by_root.items():
+    for root in roots:
         slug = drive_slug(root)
         out = os.path.join(cfg["output_dir"], "manifests",
                            f"manifest-{slug}.csv")
         if os.path.exists(out):
             os.remove(out)  # regenerated output, never user data
         with CsvAppender(out, MANIFEST_COLUMNS) as w:
-            for r in rows:
+            for r in iter_classified(cfg, root):
                 w.write({
                     "action": ACTION_BY_CLASS.get(r["class"], "hold"),
                     "source_path": r["path"],
@@ -189,17 +200,17 @@ def _reason_key(row):
     return f"{row['class']}/{row['subclass']}: {ev}"
 
 
-def decision_list(cfg, all_rows_by_root):
+def decision_list(cfg, roots):
     groups = {}
-    for root, rows in all_rows_by_root.items():
-        for r in rows:
+    for root in roots:
+        for r in iter_classified(cfg, root):
             needs = (r["class"] == "UNKNOWN" or r["confidence"] == "low" or
                      "PROBABLE dupe of D:" in r["evidence"] or
                      "sole survivor" in r["evidence"])
             if not needs:
                 continue
-            top = re.split(r"[\\/]", os.path.relpath(r["path"], root))[0]
-            key = (drive_slug(root), _reason_key(r), top)
+            key = (drive_slug(root), _reason_key(r),
+                   _top_component(root, r["path"]))
             g = groups.setdefault(key, {"count": 0, "bytes": 0, "ex": []})
             g["count"] += 1
             g["bytes"] += _size(r)
@@ -225,13 +236,12 @@ def decision_list(cfg, all_rows_by_root):
 
 
 def run_reports(cfg, roots, logger):
-    all_rows = {root: _load_classified(cfg, root) for root in roots}
     outs = []
-    for root, rows in all_rows.items():
-        outs.append(per_drive_report(cfg, root, rows))
-    outs.append(master_plan(cfg, all_rows))
-    outs.extend(write_manifests(cfg, all_rows))
-    outs.append(decision_list(cfg, all_rows))
+    for root in roots:
+        outs.append(per_drive_report(cfg, root))
+    outs.append(master_plan(cfg, roots))
+    outs.extend(write_manifests(cfg, roots))
+    outs.append(decision_list(cfg, roots))
     for o in outs:
         logger.info("wrote %s", o)
     return outs

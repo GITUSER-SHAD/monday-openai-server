@@ -22,7 +22,7 @@ import os
 import re
 
 from .util import CLASSIFY_COLUMNS, CsvAppender, drive_slug, norm_key
-from .inventory import load_inventory
+from .inventory import iter_inventory
 from .hashing import load_all_hashes
 from .dupes import (
     probable_d_matches, resolve_dupe_groups, write_d_hash_request,
@@ -126,11 +126,16 @@ class BoxMap:
 
 
 def detect_boxes(root, rows, logger):
-    """Scan a drive's inventory rows and find archive-box roots."""
+    """Scan a drive's inventory rows (single pass; generator-friendly) and
+    find archive-box roots. Memory stays proportional to directory count,
+    not file count."""
     slug = drive_slug(root)
     box = BoxMap()
     dirs_seen = set()
-    dir_children_files = {}
+    marker_dirs = set()      # dirs containing NTUSER.DAT-style files
+    versioned_counts = {}    # version-store-named dir -> versioned-file count
+    image_files = []         # standalone backup images
+
     for row in rows:
         parts = _split_rel(root, row["path"])
         if not parts:
@@ -138,7 +143,14 @@ def detect_boxes(root, rows, logger):
         for i in range(1, len(parts)):
             dirs_seen.add(tuple(parts[:i]))
         d = tuple(parts[:-1])
-        dir_children_files.setdefault(d, []).append(parts[-1])
+        name_low = parts[-1].casefold()
+        if name_low in PROFILE_MARKERS:
+            marker_dirs.add(d)
+        if d and d[-1].casefold() in VERSION_STORE_DIRNAMES and \
+                VERSIONED_FILE.search(parts[-1]):
+            versioned_counts[d] = versioned_counts.get(d, 0) + 1
+        if row["ext"] in BACKUP_IMAGE_EXT:
+            image_files.append((parts, row["ext"]))
 
     systemish_top = set()
     for d in dirs_seen:
@@ -159,16 +171,13 @@ def detect_boxes(root, rows, logger):
             box.add_box(f"top:{top_low}", top,
                         f"contains user-profile marker dir "
                         f"{'/'.join(d)} (AppData)", {top})
-        names = {n.casefold() for n in dir_children_files.get(d, [])}
-        if names & PROFILE_MARKERS and len(d) >= 2:
+        if d in marker_dirs and len(d) >= 2:
             box.add_box(f"top:{top_low}", top,
                         f"contains profile marker file under {'/'.join(d)}",
                         {top})
         # version stores (WD SmartWare History, Windows File History)
         if base in VERSION_STORE_DIRNAMES:
-            versioned = sum(
-                1 for n in dir_children_files.get(d, [])
-                if VERSIONED_FILE.search(n))
+            versioned = versioned_counts.get(d, 0)
             if versioned >= 3 or ".swstor" in " ".join(d).casefold():
                 box.add_box(f"top:{top_low}", top,
                             f"version store {'/'.join(d)} "
@@ -181,16 +190,11 @@ def detect_boxes(root, rows, logger):
                     ", ".join(sorted(systemish_top)), systemish_top)
 
     # standalone backup images: one box per image file
-    for row in rows:
-        ext = row["ext"]
-        if ext in BACKUP_IMAGE_EXT:
-            parts = _split_rel(root, row["path"])
-            if not parts:
-                continue
-            stem = os.path.splitext(parts[-1])[0]
-            box.add_box(f"img:{'/'.join(parts).casefold()}",
-                        stem or parts[-1],
-                        f"backup image file (.{ext})", {"/".join(parts)})
+    for parts, ext in image_files:
+        stem = os.path.splitext(parts[-1])[0]
+        box.add_box(f"img:{'/'.join(parts).casefold()}",
+                    stem or parts[-1],
+                    f"backup image file (.{ext})", {"/".join(parts)})
 
     box.finalize()
     if box.boxes:
@@ -398,7 +402,10 @@ def classify_paths(cfg, root):
 
 
 def detect_repos(root, rows):
-    """Rel-part tuples of directories that contain a .git dir."""
+    """Rel-part tuples of directories that contain a .git dir.
+
+    Accepts any iterable of inventory rows (single pass).
+    """
     repos = set()
     for row in rows:
         parts = _split_rel(root, row["path"])
@@ -417,35 +424,40 @@ def _repo_root_for(parts, repo_roots):
 
 
 def run_classify(cfg, roots, dref, logger):
-    """Classify all drives. Rewrites classify CSVs (cheap, pure computation)."""
+    """Classify all drives. Rewrites classify CSVs (cheap, pure computation).
+
+    All inventory reads stream from the CSVs; memory holds only the hash
+    candidates and dupe maps, never full inventories.
+    """
     hashes = load_all_hashes(cfg, roots)
-    inventories = {root: load_inventory(cfg, root) for root in roots}
 
     dupe_input = []
-    for root, rows in inventories.items():
-        for row in rows:
+    for root in roots:
+        for row in iter_inventory(cfg, root):
             h = hashes.get(norm_key(row["path"]))
             if h and h["full"]:
                 dupe_input.append({"path": row["path"], "size": h["size"],
                                    "mtime": row["modified_utc"],
                                    "full": h["full"]})
     d_dupes, ext_dupes, keepers = resolve_dupe_groups(dupe_input, dref)
-    probable_d = probable_d_matches(inventories, dref)
+    del dupe_input, hashes
+    probable_d = probable_d_matches(
+        cfg, roots, dref, lambda r: iter_inventory(cfg, r))
     write_d_hash_request(cfg, probable_d, logger)
     logger.info("dupes: %d exact-vs-D, %d external non-keepers, "
                 "%d keeper groups, %d probable-vs-D",
                 len(d_dupes), len(ext_dupes), len(keepers), len(probable_d))
 
     stats = {}
-    for root, rows in inventories.items():
-        box_map = detect_boxes(root, rows, logger)
-        repo_roots = detect_repos(root, rows)
+    for root in roots:
+        box_map = detect_boxes(root, iter_inventory(cfg, root), logger)
+        repo_roots = detect_repos(root, iter_inventory(cfg, root))
         out_path = classify_paths(cfg, root)
         if os.path.exists(out_path):
             os.remove(out_path)  # classification output only, never user data
         counts = {}
         with CsvAppender(out_path, CLASSIFY_COLUMNS) as out:
-            for row in rows:
+            for row in iter_inventory(cfg, root):
                 rec = _classify_row(cfg, root, row, box_map, repo_roots,
                                     d_dupes, ext_dupes, keepers, probable_d)
                 out.write(rec)

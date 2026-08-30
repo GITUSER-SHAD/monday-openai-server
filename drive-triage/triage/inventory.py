@@ -133,11 +133,15 @@ def run_inventory(cfg, root, logger, max_files=None):
     return written, written + len(seen)
 
 
-def load_inventory(cfg, root):
-    """Return completed inventory rows for a drive (error rows included)."""
+def iter_inventory(cfg, root):
+    """Stream completed inventory rows for a drive (error rows included).
+
+    A generator so multi-million-file drives never need the whole inventory
+    in memory; call it again for another pass.
+    """
     paths = inventory_paths(cfg, root)
     if not os.path.exists(paths["done"]):
         raise SystemExit(
             f"inventory for {root} is not complete; run `inventory` first "
             f"(it resumes automatically).")
-    return list(read_csv_rows(paths["csv"], INVENTORY_COLUMNS))
+    yield from read_csv_rows(paths["csv"], INVENTORY_COLUMNS)
