@@ -2,26 +2,27 @@
 Phase 1 CSVs - touches no target-drive bytes (hashing already did the reads).
 
 Precedence per file:
-  stat-error -> UNKNOWN
+  stat-error / reparse-point -> UNKNOWN
   archive-box member -> ARCHIVE_BOX (box stays intact; junk-within-box and
       sole-surviving content are annotated in evidence, never re-sorted)
   zero-byte -> JUNK
   exact SHA256 match vs D: reference -> EXACT_DUPE_OF_D
   non-keeper of an external dupe group -> DUPE_EXTERNAL
-  junk patterns -> JUNK (pattern evidence stated)
+  junk patterns -> JUNK (pattern evidence stated; a dupe-group KEEPER is
+      never junked - it is the only copy that survives)
   media extensions -> MEDIA (year/project parsed; personal vs client;
-      NAS tier + fastwork subfolder mapping)
+      per-PROJECT activity decides the NAS tier; fastwork subfolder mapping)
   records extensions -> RECORDS (subcategory + convention-compliant rename)
   else -> UNKNOWN (grouped for the decision list)
 
-Every row carries `evidence`. Keepers of dupe groups are classified by
-content with keeper status noted in evidence.
+proposed_path is ALWAYS a destination FOLDER; proposed_name is the new
+filename ("" = keep the current name). Every row carries evidence.
 """
 
 import os
 import re
 
-from .util import CLASSIFY_COLUMNS, CsvAppender, drive_slug, norm_key
+from .util import CLASSIFY_COLUMNS, CsvRewriter, drive_slug, norm_key
 from .inventory import iter_inventory
 from .hashing import load_all_hashes
 from .dupes import (
@@ -63,9 +64,10 @@ JUNK_NAMES = {"thumbs.db", ".ds_store", "desktop.ini", "iconcache.db",
               "albumartsmall.jpg", "folder.jpg"}
 JUNK_EXT = {"tmp", "temp", "crdownload", "part", "partial", "dmp", "chk",
             "etl", "regtrans-ms", "blf"}
+# NOTE: no generic "packages" here - real user folders carry that name.
 CACHE_DIRS = {"cache", "caches", ".cache", "temp", "tmp", ".thumbnails",
               "thumbnails", "node_modules", "__pycache__", ".gradle",
-              "packages", "servicepackfiles", "softwaredistribution"}
+              "servicepackfiles", "softwaredistribution"}
 
 BACKUP_IMAGE_EXT = {"tib", "tibx", "vhd", "vhdx", "wim", "bkf", "spf", "spi",
                     "gho", "v2i", "swstor"}
@@ -84,11 +86,16 @@ BACKUPISH_NAME = re.compile(
     r"old[ _-]?(laptop|pc|computer|desktop|drive|mac)|"
     r"(laptop|pc|computer|desktop|c[ _-]?drive)[ _-]?(backup|copy|dump)|"
     r"time ?machine|\.swstor)", re.IGNORECASE)
+# Generic version-store dir names need STRONG (timestamped) version markers;
+# "photo (2).jpg"-style copy suffixes are everyday Windows litter and only
+# count inside explicitly backup-tool-named stores.
 VERSION_STORE_DIRNAMES = {"history", "filehistory", "file history",
                           "$archive$", "versions"}
-VERSIONED_FILE = re.compile(
-    r"(\(\d{4}[_-]\d{2}[_-]\d{2}[ _]\d{2}[_-]\d{2}[_-]\d{2}( utc)?\)|"
-    r"\.v\d{2,}$|\(\d+\)\.[A-Za-z0-9]{1,5}$)", re.IGNORECASE)
+BACKUPTOOL_STORE_DIRNAMES = {"filehistory", "file history", "$archive$"}
+TIMESTAMP_VERSIONED = re.compile(
+    r"\(\d{4}[_-]\d{2}[_-]\d{2}[ _]\d{2}[_-]\d{2}[_-]\d{2}( utc)?\)",
+    re.IGNORECASE)
+COPYNUM_VERSIONED = re.compile(r"\(\d+\)\.[A-Za-z0-9]{1,5}$")
 PROFILE_MARKERS = {"ntuser.dat", "ntuser.ini", "usrclass.dat"}
 
 
@@ -98,11 +105,13 @@ def _split_rel(root, path):
 
 
 class BoxMap:
-    """Maps files to detected archive boxes on one drive."""
+    """Maps files to detected archive boxes on one drive. Lookup is indexed
+    by the first path component so classification stays O(1)-ish even with
+    many boxes (e.g. one per backup-image file)."""
 
     def __init__(self):
-        self.boxes = {}          # box_key -> {"name","evidence","prefixes"}
-        self._prefix_index = []  # (prefix_tuple, box_key)
+        self.boxes = {}       # box_key -> {"name","evidence","prefixes"}
+        self._by_first = {}   # first component (casefold) -> [(prefix, key)]
 
     def add_box(self, key, name, evidence, prefixes):
         if key in self.boxes:
@@ -112,14 +121,19 @@ class BoxMap:
                                "prefixes": set(prefixes)}
 
     def finalize(self):
-        self._prefix_index = sorted(
-            ((tuple(s.casefold() for s in re.split(r"[\\/]", p)), k)
-             for k, b in self.boxes.items() for p in b["prefixes"]),
-            key=lambda t: -len(t[0]))  # longest prefix wins
+        self._by_first = {}
+        for key, b in self.boxes.items():
+            for p in b["prefixes"]:
+                parts = tuple(s.casefold() for s in re.split(r"[\\/]", p))
+                self._by_first.setdefault(parts[0], []).append((parts, key))
+        for lst in self._by_first.values():
+            lst.sort(key=lambda t: -len(t[0]))  # longest prefix wins
 
     def lookup(self, rel_parts):
+        if not rel_parts:
+            return None
         low = tuple(s.casefold() for s in rel_parts)
-        for prefix, key in self._prefix_index:
+        for prefix, key in self._by_first.get(low[0], ()):
             if low[:len(prefix)] == prefix:
                 return key
         return None
@@ -132,9 +146,10 @@ def detect_boxes(root, rows, logger):
     slug = drive_slug(root)
     box = BoxMap()
     dirs_seen = set()
-    marker_dirs = set()      # dirs containing NTUSER.DAT-style files
-    versioned_counts = {}    # version-store-named dir -> versioned-file count
-    image_files = []         # standalone backup images
+    marker_dirs = set()        # dirs containing NTUSER.DAT-style files
+    strong_versioned = {}      # version-store dir -> timestamped-file count
+    weak_versioned = {}        # version-store dir -> copy-number-file count
+    image_files = []           # standalone backup images
 
     for row in rows:
         parts = _split_rel(root, row["path"])
@@ -143,12 +158,14 @@ def detect_boxes(root, rows, logger):
         for i in range(1, len(parts)):
             dirs_seen.add(tuple(parts[:i]))
         d = tuple(parts[:-1])
-        name_low = parts[-1].casefold()
-        if name_low in PROFILE_MARKERS:
+        name = parts[-1]
+        if name.casefold() in PROFILE_MARKERS:
             marker_dirs.add(d)
-        if d and d[-1].casefold() in VERSION_STORE_DIRNAMES and \
-                VERSIONED_FILE.search(parts[-1]):
-            versioned_counts[d] = versioned_counts.get(d, 0) + 1
+        if d and d[-1].casefold() in VERSION_STORE_DIRNAMES:
+            if TIMESTAMP_VERSIONED.search(name):
+                strong_versioned[d] = strong_versioned.get(d, 0) + 1
+            elif COPYNUM_VERSIONED.search(name):
+                weak_versioned[d] = weak_versioned.get(d, 0) + 1
         if row["ext"] in BACKUP_IMAGE_EXT:
             image_files.append((parts, row["ext"]))
 
@@ -177,11 +194,15 @@ def detect_boxes(root, rows, logger):
                         {top})
         # version stores (WD SmartWare History, Windows File History)
         if base in VERSION_STORE_DIRNAMES:
-            versioned = versioned_counts.get(d, 0)
-            if versioned >= 3 or ".swstor" in " ".join(d).casefold():
+            strong = strong_versioned.get(d, 0)
+            weak = weak_versioned.get(d, 0)
+            hit = (strong >= 3 or
+                   (base in BACKUPTOOL_STORE_DIRNAMES and strong + weak >= 3)
+                   or ".swstor" in " ".join(d).casefold())
+            if hit:
                 box.add_box(f"top:{top_low}", top,
-                            f"version store {'/'.join(d)} "
-                            f"({versioned} versioned filenames)", {top})
+                            f"version store {'/'.join(d)} ({strong} "
+                            f"timestamped + {weak} numbered versions)", {top})
 
     if systemish_top:
         name = f"{slug} profile backup"
@@ -236,11 +257,12 @@ def parse_date_from_name(name):
 
 
 def parse_year(parts, name, modified_utc):
-    """Return (year, source) where source in filename|path|mtime|None."""
+    """Return (year, source). Nearest path segment wins over outer ones -
+    the project's own year folder beats a stray year higher up."""
     date, _ = parse_date_from_name(name)
     if date:
         return date[:4], "filename"
-    for seg in parts[:-1]:
+    for seg in reversed(parts[:-1]):
         m = _YEAR_SEG.match(seg.strip())
         if m:
             return m.group(1), "path"
@@ -265,6 +287,11 @@ _ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 def sanitize_component(s):
     s = _ILLEGAL.sub("-", s).strip(" .")
     return re.sub(r"\s+", " ", s)
+
+
+def _word_pattern(keyword):
+    return re.compile(r"(?<![A-Za-z0-9])" + re.escape(keyword.casefold()) +
+                      r"(?![A-Za-z0-9])")
 
 
 # ---------------------------------------------------------------------------
@@ -306,17 +333,56 @@ def project_from_parts(parts):
     return ""
 
 
-def fastwork_subfolder(rel_within_project, ext):
+def _project_rel_dirs(parts, project):
+    """Directory path INSIDE the project (after its nearest occurrence)."""
+    idx = None
+    for i in range(len(parts) - 2, -1, -1):  # nearest ancestor occurrence
+        if parts[i] == project:
+            idx = i
+            break
+    return parts[idx + 1:-1] if idx is not None else parts[:-1]
+
+
+def fastwork_subfolder(rel_dirs, ext):
+    """Map to 01_RAW..04_DELIVERABLES from dirs INSIDE the project only, and
+    return (folder, remaining_rel_dirs, evidence). The matched structural
+    segment is dropped from the remaining path (RAW/A001.CR2 becomes
+    01_RAW\\A001.CR2, not 01_RAW\\RAW\\A001.CR2); everything else is kept so
+    same-named files from different card folders can never collide."""
+    joined = "\\".join(rel_dirs)
     for pat, folder in FASTWORK_MAP:
-        if pat.search(rel_within_project):
-            return folder, f"path segment matches {folder}"
+        m = pat.search(joined)
+        if m:
+            remaining = list(rel_dirs)
+            for i, seg in enumerate(remaining):
+                if pat.search(seg):
+                    del remaining[i]
+                    break
+            return folder, remaining, f"path segment matches {folder}"
     if ext in PROJECT_EXT:
-        return "03_EDIT", "project-file extension"
+        return "03_EDIT", list(rel_dirs), "project-file extension"
     if ext in RAW_PHOTO_EXT or ext in {"braw", "r3d", "mts", "m2ts", "crm"}:
-        return "01_RAW", "camera-original extension"
+        return "01_RAW", list(rel_dirs), "camera-original extension"
     if ext in VIDEO_EXT | PHOTO_EXT | AUDIO_EXT:
-        return "01_RAW", "media extension, no structural hint (defaulted)"
-    return "03_EDIT", "unmapped (defaulted)"
+        return ("01_RAW", list(rel_dirs),
+                "media extension, no structural hint (defaulted)")
+    return "03_EDIT", list(rel_dirs), "unmapped (defaulted)"
+
+
+def collect_project_activity(cfg, root):
+    """(project -> newest media mtime) for one drive, so one project lands
+    on ONE NAS tier instead of splitting per-file."""
+    latest = {}
+    for row in iter_inventory(cfg, root):
+        if row["error"] or row["ext"] not in MEDIA_EXT:
+            continue
+        parts = _split_rel(root, row["path"])
+        if not parts:
+            continue
+        project = project_from_parts(parts) or "_loose files"
+        if row["modified_utc"] > latest.get(project, ""):
+            latest[project] = row["modified_utc"]
+    return latest
 
 
 # ---------------------------------------------------------------------------
@@ -351,12 +417,14 @@ RECORD_RULES = [
 
 def classify_record(cfg, parts, name, date, year):
     """Return (subfolder_path, who, evidence)."""
-    hay = " ".join(parts).casefold() + " " + name.casefold()
+    hay = (" ".join(parts) + " " + name).casefold()
     who = ""
     for code, cname in cfg["client_codes"].items():
-        if code.casefold() in hay or cname.casefold() in hay:
-            return (f"Records\\Business\\Clients\\{code} {cname}", cname,
-                    f"matched client {code}")
+        if _word_pattern(code).search(hay) or \
+                _word_pattern(cname).search(hay):
+            folder = ("Records\\Business\\Clients\\" +
+                      sanitize_component(f"{code} {cname}"))
+            return folder, cname, f"matched client {code}"
     for sub, pat in RECORD_RULES:
         m = pat.search(hay)
         if m:
@@ -424,22 +492,26 @@ def _repo_root_for(parts, repo_roots):
 
 
 def run_classify(cfg, roots, dref, logger):
-    """Classify all drives. Rewrites classify CSVs (cheap, pure computation).
+    """Classify all drives. Rewrites classify CSVs atomically (temp+replace),
+    so report can never consume a half-written classification.
 
     All inventory reads stream from the CSVs; memory holds only the hash
     candidates and dupe maps, never full inventories.
     """
+    dref.drop_paths_under(roots, logger)
     hashes = load_all_hashes(cfg, roots)
 
-    dupe_input = []
+    dupe_input = {}
     for root in roots:
         for row in iter_inventory(cfg, root):
-            h = hashes.get(norm_key(row["path"]))
-            if h and h["full"]:
-                dupe_input.append({"path": row["path"], "size": h["size"],
+            key = norm_key(row["path"])
+            h = hashes.get(key)
+            if h and key not in dupe_input:
+                dupe_input[key] = {"path": row["path"], "size": h["size"],
                                    "mtime": row["modified_utc"],
-                                   "full": h["full"]})
-    d_dupes, ext_dupes, keepers = resolve_dupe_groups(dupe_input, dref)
+                                   "full": h["full"]}
+    d_dupes, ext_dupes, keepers = resolve_dupe_groups(
+        list(dupe_input.values()), dref)
     del dupe_input, hashes
     probable_d = probable_d_matches(
         cfg, roots, dref, lambda r: iter_inventory(cfg, r))
@@ -452,14 +524,13 @@ def run_classify(cfg, roots, dref, logger):
     for root in roots:
         box_map = detect_boxes(root, iter_inventory(cfg, root), logger)
         repo_roots = detect_repos(root, iter_inventory(cfg, root))
-        out_path = classify_paths(cfg, root)
-        if os.path.exists(out_path):
-            os.remove(out_path)  # classification output only, never user data
+        activity = collect_project_activity(cfg, root)
         counts = {}
-        with CsvAppender(out_path, CLASSIFY_COLUMNS) as out:
+        with CsvRewriter(classify_paths(cfg, root), CLASSIFY_COLUMNS) as out:
             for row in iter_inventory(cfg, root):
                 rec = _classify_row(cfg, root, row, box_map, repo_roots,
-                                    d_dupes, ext_dupes, keepers, probable_d)
+                                    activity, d_dupes, ext_dupes, keepers,
+                                    probable_d)
                 out.write(rec)
                 counts[rec["class"]] = counts.get(rec["class"], 0) + 1
         stats[root] = counts
@@ -467,8 +538,8 @@ def run_classify(cfg, roots, dref, logger):
     return stats
 
 
-def _classify_row(cfg, root, row, box_map, repo_roots, d_dupes, ext_dupes,
-                  keepers, probable_d):
+def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
+                  ext_dupes, keepers, probable_d):
     parts = _split_rel(root, row["path"])
     name = parts[-1] if parts else os.path.basename(row["path"])
     ext = row["ext"]
@@ -494,40 +565,55 @@ def _classify_row(cfg, root, row, box_map, repo_roots, d_dupes, ext_dupes,
         return rec
 
     if row["error"]:
-        return done("UNKNOWN", "stat-error",
-                    f"could not stat: {row['error']}", "low")
+        sub = "reparse-point" if "reparse-point" in row["error"] \
+            else "stat-error"
+        return done("UNKNOWN", sub,
+                    f"not readable: {row['error']}", "low")
 
     # ----- archive box membership ------------------------------------------
     box_key = box_map.lookup(parts) if parts else None
     if box_key:
         box = box_map.boxes[box_key]
         box_name = sanitize_component(box["name"])
-        rel = "\\".join(parts)
-        note = ""
-        if JUNK_WITHIN_BOX.search(rel):
-            if key in d_dupes or key in ext_dupes or _is_junk(
-                    parts, name, ext, size)[0]:
+        # keep native layout, but don't duplicate the box's own top level
+        rel_parts = parts[1:] if parts and \
+            parts[0].casefold() == box_name.casefold() else parts
+        rel_dir = "\\".join(rel_parts[:-1])
+        proposed_dir = "Archive\\" + box_name + \
+            ("\\" + rel_dir if rel_dir else "")
+        full_rel = "\\".join(parts)
+        if size == 0:
+            note = "; zero-byte (junk-within-box prune candidate)"
+        elif key in ext_dupes:
+            note = ("; byte-identical copy exists outside this box at "
+                    + ext_dupes[key])
+        elif key in d_dupes:
+            note = "; byte-identical to D: reference " + d_dupes[key]
+        elif key in keepers:
+            note = (f"; kept copy of a {keepers[key]}-copy duplicate group "
+                    f"(other copies are delete-candidates)")
+        elif JUNK_WITHIN_BOX.search(full_rel):
+            if _is_junk(parts, name, ext, size)[0]:
                 note = "; junk-within-box (prune candidate, separate approval)"
             else:
-                note = ("; inside version-store/AppData but NOT proven "
-                        "duplicated elsewhere - potential sole survivor, "
-                        "kept in box")
-        elif (ext in MEDIA_EXT or ext in DOC_EXT) and \
-                key not in d_dupes and key not in ext_dupes:
-            note = "; sole-surviving content inside box (no dupe elsewhere)"
+                note = ("; inside version-store/AppData but no duplicate "
+                        "found elsewhere - potential sole survivor, kept "
+                        "in box")
+        elif ext in MEDIA_EXT or ext in DOC_EXT:
+            note = "; no duplicate found elsewhere (sole-surviving content)"
+        else:
+            note = ""
         return done(
             "ARCHIVE_BOX", box_name,
             f"member of archive box {box_name!r}: {box['evidence']}{note}",
-            "high",
-            "Archive\\" + box_name + "\\" + rel,
-            "", "hdd-mirror")
+            "high", proposed_dir, "", "hdd-mirror")
 
     # ----- zero-byte --------------------------------------------------------
     if size == 0:
         return done("JUNK", "zero-byte", "zero-byte file", "high")
 
     # ----- exact dupes ------------------------------------------------------
-    if key in d_dupes:
+    if key in d_dupes and norm_key(d_dupes[key]) != key:
         return done("EXACT_DUPE_OF_D", "exact-sha256",
                     "SHA256 identical to D: reference copy "
                     "(safe-delete candidate after your approval)",
@@ -548,12 +634,18 @@ def _classify_row(cfg, root, row, box_map, repo_roots, d_dupes, ext_dupes,
                          f"size+name; D: reference lacks hashes - see "
                          f"d-hash-request.csv]")
 
-    # ----- junk -------------------------------------------------------------
+    # ----- junk (never for a dupe-group keeper: it is the surviving copy) --
     is_junk, junk_kind, junk_evidence = _is_junk(parts, name, ext, size)
     if is_junk:
+        if key in keepers:
+            return done(
+                "UNKNOWN", "junk-pattern-keeper",
+                f"matches junk pattern ({junk_evidence}) but is the elected "
+                f"keeper of a {keepers[key]}-copy duplicate group - not "
+                f"junked; decide fate of the whole group" + probable_note,
+                "low")
         conf = "high" if not probable_note else "medium"
-        return done("JUNK", junk_kind, junk_evidence + keeper_note +
-                    probable_note, conf)
+        return done("JUNK", junk_kind, junk_evidence + probable_note, conf)
 
     # ----- git repos: hands off, one decision per repo ---------------------
     repo = _repo_root_for(parts, repo_roots)
@@ -567,13 +659,13 @@ def _classify_row(cfg, root, row, box_map, repo_roots, d_dupes, ext_dupes,
     if ext in MEDIA_EXT and not (
             ext in {"jpg", "jpeg", "png", "pdf"} and
             SCANNED_RECORD_HINTS.search(name)):
-        return _classify_media(cfg, rec, done, parts, name, ext, row,
+        return _classify_media(cfg, done, parts, name, ext, row, activity,
                                keeper_note, probable_note)
 
     # ----- records ----------------------------------------------------------
     if ext in DOC_EXT or (ext in {"jpg", "jpeg", "png"} and
                           SCANNED_RECORD_HINTS.search(name)):
-        return _classify_records(cfg, rec, done, parts, name, ext, row,
+        return _classify_records(cfg, done, parts, name, ext, row,
                                  keeper_note, probable_note)
 
     return done("UNKNOWN", f"ext-{ext or 'none'}",
@@ -592,6 +684,8 @@ def _is_junk(parts, name, ext, size):
         return True, "temp", f"temporary-file extension .{ext}"
     for seg in parts[:-1]:
         if seg.casefold() in CACHE_DIRS:
+            if ext in MEDIA_EXT or ext in DOC_EXT:
+                break  # real content dumped in a temp-named dir: not junk
             return True, "cache", \
                 f"inside cache/regenerable directory {seg!r}"
     if ext in INSTALLER_EXT:
@@ -607,13 +701,14 @@ def _is_junk(parts, name, ext, size):
     return False, "", ""
 
 
-def _classify_media(cfg, rec, done, parts, name, ext, row, keeper_note,
+def _classify_media(cfg, done, parts, name, ext, row, activity, keeper_note,
                     probable_note):
     year, year_src = parse_year(parts, name, row["modified_utc"])
     project = project_from_parts(parts)
-    hay = ("/".join(parts)).casefold()
-    personal = next((k for k in cfg["personal_shoot_keywords"]
-                     if k.casefold() in hay), None)
+    hay = "/".join(parts)
+    personal = next(
+        (k for k in cfg["personal_shoot_keywords"]
+         if _word_pattern(k).search(hay.casefold())), None)
 
     conf = "high"
     ev = []
@@ -635,41 +730,44 @@ def _classify_media(cfg, rec, done, parts, name, ext, row, keeper_note,
         ev.append(f"project {project!r} from path")
 
     project_c = sanitize_component(project)
-    idx = next((i for i, s in enumerate(parts) if s == project), None)
-    rel_within = "\\".join(parts[idx + 1:]) if idx is not None else name
+    rel_dirs = _project_rel_dirs(parts, project) if project != "_loose files" \
+        else []
+    rel_dir = "\\".join(rel_dirs)
 
     if personal:
-        proposed = f"Media\\Personal Shoots\\{project_c}\\{rel_within}"
+        proposed_dir = "Media\\Personal Shoots\\" + project_c + \
+            ("\\" + rel_dir if rel_dir else "")
         ev.append(f"personal shoot (keyword {personal!r})")
         tier = "hdd-mirror"
         sub = "personal-shoot"
     else:
-        mtime = row["modified_utc"]
         cutoff = cfg.get("_activity_cutoff_iso", "")
-        active = bool(cutoff and mtime and mtime >= cutoff)
+        newest = activity.get(project, row["modified_utc"])
+        active = bool(cutoff and newest and newest >= cutoff)
         if active:
-            folder, map_ev = fastwork_subfolder(
-                "\\".join(parts[:-1]), ext)
-            proposed = f"{project_c}\\{folder}\\{name}"
-            ev.append(f"active project (modified {mtime[:10]}); "
+            folder, remaining, map_ev = fastwork_subfolder(rel_dirs, ext)
+            rest = "\\".join(remaining)
+            proposed_dir = project_c + "\\" + folder + \
+                ("\\" + rest if rest else "")
+            ev.append(f"active project (newest file {newest[:10]}); "
                       f"fastwork mapping: {map_ev}")
-            if "defaulted" in map_ev:
-                conf = "medium" if conf == "high" else conf
+            if "defaulted" in map_ev and conf == "high":
+                conf = "medium"
             tier = "fastwork"
             sub = "client-or-project"
         else:
-            proposed = (f"Media\\{year}\\{project_c}\\{rel_within}"
-                        if year else f"Media\\_unknown-year\\{project_c}"
-                                     f"\\{rel_within}")
+            base = f"Media\\{year}" if year else "Media\\_unknown-year"
+            proposed_dir = base + "\\" + project_c + \
+                ("\\" + rel_dir if rel_dir else "")
             tier = "hdd-mirror"
             sub = "client-or-project"
     if probable_note:
         conf = "low"
     return done("MEDIA", sub, "; ".join(ev) + keeper_note + probable_note,
-                conf, proposed, "", tier)
+                conf, proposed_dir, "", tier)
 
 
-def _classify_records(cfg, rec, done, parts, name, ext, row, keeper_note,
+def _classify_records(cfg, done, parts, name, ext, row, keeper_note,
                       probable_note):
     date, date_ev = parse_date_from_name(name)
     conf = "high"

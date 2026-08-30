@@ -225,6 +225,55 @@ class PipelineTest(unittest.TestCase):
             self.assertEqual(row["subclass"], kind, rel)
             self.assertTrue(row["evidence"], f"junk needs evidence: {rel}")
 
+    # -- review-driven regressions ------------------------------------------
+
+    def test_keeper_of_dupe_group_never_junked(self):
+        cache_copy = self.erow("cache/dupJ.bin")
+        kept_copy = self.erow("keep/dupJ.bin")
+        self.assertEqual(cache_copy["class"], "DUPE_EXTERNAL")
+        self.assertNotIn(kept_copy["class"], ("JUNK", "DUPE_EXTERNAL"))
+        self.assertIn("keeper", kept_copy["evidence"])
+
+    def test_media_in_temp_dir_not_junk(self):
+        row = self.erow("temp/real_footage.mov")
+        self.assertEqual(row["class"], "MEDIA")
+
+    def test_personnel_not_personal(self):
+        row = self.erow("Shoots/2022 Personnel Training/video.mp4")
+        self.assertEqual(row["class"], "MEDIA")
+        self.assertNotEqual(row["subclass"], "personal-shoot")
+
+    def test_fastwork_same_names_do_not_collide(self):
+        a = self.erow("Shoots/2023 Acme Rebrand/RAW/card1/A002.CR2")
+        b = self.erow("Shoots/2023 Acme Rebrand/RAW/card2/A002.CR2")
+        self.assertNotEqual(a["proposed_path"], b["proposed_path"])
+        self.assertTrue(a["proposed_path"].startswith(
+            "2023 Acme Rebrand\\01_RAW"), a["proposed_path"])
+
+    def test_copy_number_files_do_not_create_box(self):
+        row = self.erow("Stuff2/History/photo (1).jpg")
+        self.assertNotEqual(row["class"], "ARCHIVE_BOX")
+
+    def test_box_path_does_not_duplicate_box_level(self):
+        row = self.erow("OldLaptopBackup/Users/jason/Documents/letter.doc")
+        self.assertEqual(row["proposed_path"],
+                         "Archive\\OldLaptopBackup\\Users\\jason\\Documents")
+
+    def test_loose_root_file_classified(self):
+        row = self.erow("LooseClip.mov")
+        self.assertEqual(row["class"], "MEDIA")
+        self.assertEqual(row["confidence"], "low")
+
+    def test_manifest_actions_match_class(self):
+        expected = {"MEDIA": "copy", "RECORDS": "copy", "ARCHIVE_BOX": "copy",
+                    "UNKNOWN": "hold", "JUNK": "delete-candidate",
+                    "EXACT_DUPE_OF_D": "delete-candidate",
+                    "DUPE_EXTERNAL": "delete-candidate"}
+        for r in read_csv_rows(
+                os.path.join(self.out, "manifests", "manifest-driveE.csv"),
+                MANIFEST_COLUMNS):
+            self.assertEqual(r["action"], expected[r["class"]], r["class"])
+
     # -- unknown / repos ----------------------------------------------------
 
     def test_git_repo_grouped_unknown(self):
@@ -369,6 +418,40 @@ class GuardTest(unittest.TestCase):
             self.assertEqual(os.listdir(root), [],
                              "guard fired but something was written to the "
                              "scanned drive")
+
+    def test_overlapping_scan_roots_refused(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "driveZ")
+            sub = os.path.join(root, "sub")
+            os.makedirs(sub)
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(["inventory", "--drive", root, "--drive", sub,
+                          "--output-dir", os.path.join(base, "out"),
+                          "--log-dir", os.path.join(base, "logs")])
+            self.assertIn("overlap", str(ctx.exception))
+
+    def test_c_and_d_refused_as_drive_args(self):
+        with tempfile.TemporaryDirectory() as base:
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(["inventory", "--drive", "D:\\",
+                          "--output-dir", os.path.join(base, "out"),
+                          "--log-dir", os.path.join(base, "logs")])
+            self.assertIn("excluded", str(ctx.exception))
+
+    def test_torn_tail_repaired_not_glued(self):
+        from triage.util import CsvAppender
+        with tempfile.TemporaryDirectory() as base:
+            p = os.path.join(base, "t.csv")
+            cols = ["path", "size", "error"]
+            with CsvAppender(p, cols) as w:
+                w.write({"path": "a", "size": "1", "error": ""})
+            with open(p, "a", encoding="utf-8", newline="") as fh:
+                fh.write("half,2")  # crash mid-row: no trailing newline
+            with CsvAppender(p, cols) as w:
+                w.write({"path": "b", "size": "3", "error": ""})
+            rows = list(read_csv_rows(p, cols))
+            paths = [r["path"] for r in rows]
+            self.assertEqual(paths, ["a", "b"])  # torn row dropped, not glued
 
     @unittest.skipUnless(hasattr(os, "symlink"), "no symlinks here")
     def test_symlinked_dir_not_traversed(self):

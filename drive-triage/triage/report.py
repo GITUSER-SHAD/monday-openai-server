@@ -12,7 +12,7 @@ import re
 from collections import Counter, defaultdict
 
 from .util import (
-    CLASSIFY_COLUMNS, MANIFEST_COLUMNS, CsvAppender, drive_slug, fmt_gb,
+    CLASSIFY_COLUMNS, MANIFEST_COLUMNS, CsvRewriter, drive_slug, fmt_gb,
     read_csv_rows, write_text,
 )
 from .classify import classify_paths
@@ -29,7 +29,12 @@ ACTION_BY_CLASS = {
 
 
 def iter_classified(cfg, root):
-    yield from read_csv_rows(classify_paths(cfg, root), CLASSIFY_COLUMNS)
+    path = classify_paths(cfg, root)
+    if not os.path.exists(path):
+        raise SystemExit(
+            f"no classification for {root} ({path} missing) - run "
+            f"`python -m triage classify` first.")
+    yield from read_csv_rows(path, CLASSIFY_COLUMNS)
 
 
 def _size(row):
@@ -170,9 +175,7 @@ def write_manifests(cfg, roots):
         slug = drive_slug(root)
         out = os.path.join(cfg["output_dir"], "manifests",
                            f"manifest-{slug}.csv")
-        if os.path.exists(out):
-            os.remove(out)  # regenerated output, never user data
-        with CsvAppender(out, MANIFEST_COLUMNS) as w:
+        with CsvRewriter(out, MANIFEST_COLUMNS) as w:
             for r in iter_classified(cfg, root):
                 w.write({
                     "action": ACTION_BY_CLASS.get(r["class"], "hold"),

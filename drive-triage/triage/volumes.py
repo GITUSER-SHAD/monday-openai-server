@@ -16,8 +16,11 @@ import subprocess
 
 from .util import IS_WINDOWS, atomic_write_json, fmt_gb, now_stamp
 
-# Fixed command strings - never built from user input.
+# Fixed command strings - never built from user input. The UTF-8 output
+# encoding is forced because Windows PowerShell 5.1 otherwise emits the OEM
+# code page to pipes, garbling non-ASCII volume labels.
 _PS_COMMAND = r"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $vols = Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
   $v = $_
   $part = Get-Partition -DriveLetter $v.DriveLetter -ErrorAction SilentlyContinue
@@ -42,16 +45,16 @@ def _enumerate_windows(logger):
         try:
             proc = subprocess.run(
                 [shell, "-NoProfile", "-NonInteractive", "-Command", _PS_COMMAND],
-                capture_output=True, text=True, timeout=120, check=False,
+                capture_output=True, timeout=120, check=False,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
             logger.warning("volume enumeration via %s failed: %s", shell, exc)
             continue
         if proc.returncode != 0:
             logger.warning("%s exited %d: %s", shell, proc.returncode,
-                           proc.stderr[:2000])
+                           proc.stderr.decode("utf-8", "replace")[:2000])
             continue
-        raw = proc.stdout.strip()
+        raw = proc.stdout.decode("utf-8", "replace").strip()
         if not raw:
             return []
         data = json.loads(raw)
@@ -139,6 +142,19 @@ def format_table(vols):
     return "\n".join(lines)
 
 
+def volume_signatures(logger):
+    """Letter ('E:') -> {label, size} for volume-identity binding."""
+    if not IS_WINDOWS:
+        return {}
+    try:
+        vols = _enumerate_windows(logger)
+    except SystemExit:
+        return {}
+    return {v["letter"].upper(): {"label": v["label"],
+                                  "size": v["size_bytes"]}
+            for v in vols}
+
+
 def run_enumerate(cfg, logger):
     vols = _enumerate_windows(logger) if IS_WINDOWS else _enumerate_linux(logger)
     stamp = now_stamp()
@@ -158,6 +174,34 @@ def run_enumerate(cfg, logger):
     }
     if not os.path.exists(scope_path):
         atomic_write_json(scope_path, proposal)
+    else:
+        # refresh-merge: newly attached volumes join the scope file as
+        # proposals; the user's existing in_scope choices are preserved
+        existing = {}
+        try:
+            with open(scope_path, "r", encoding="utf-8") as fh:
+                existing = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            existing = {}
+        known = {v.get("letter"): v for v in existing.get("volumes", [])}
+        merged, added = [], 0
+        for v in proposal["volumes"]:
+            if v["letter"] in known:
+                kept = dict(v)
+                kept["in_scope"] = bool(known[v["letter"]].get("in_scope"))
+                merged.append(kept)
+            else:
+                merged.append(v)
+                added += 1
+        # keep entries for currently-detached volumes the user already scoped
+        current_letters = {v["letter"] for v in merged}
+        for letter, v in known.items():
+            if letter not in current_letters:
+                merged.append(v)
+        if added:
+            logger.info("scope.json: %d newly attached volume(s) added as "
+                        "proposals", added)
+        atomic_write_json(scope_path, {**proposal, "volumes": merged})
     logger.info("enumerated %d volumes -> %s", len(vols), out)
     return vols, scope_path
 

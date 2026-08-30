@@ -55,15 +55,26 @@ def _is_reparse_point(entry):
     either: reading can trigger hydration. Everything reparse is therefore
     skipped for dirs and recorded-but-not-read for files.
     """
-    try:
-        st = entry.stat(follow_symlinks=False)
-    except OSError:
+    st = None
+    for _ in range(2):  # one retry: a USB hiccup must not mislabel a file
+        try:
+            st = entry.stat(follow_symlinks=False)
+            break
+        except OSError:
+            continue
+    if st is None:
         return True  # cannot prove it is safe to traverse - do not
     if getattr(st, "st_reparse_tag", 0):
         return True
     attrs = getattr(st, "st_file_attributes", 0)
     reparse_flag = getattr(statmod, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     return bool(attrs & reparse_flag)
+
+
+def _created_utc(st):
+    """Creation time: st_birthtime where the platform provides it (and on
+    Windows 3.12+ where st_ctime's meaning is changing), else st_ctime."""
+    return iso_utc(getattr(st, "st_birthtime", None) or st.st_ctime)
 
 
 def _walk_sorted(top, follow_symlinks, on_error, on_reparse):
@@ -104,8 +115,29 @@ def _walk_sorted(top, follow_symlinks, on_error, on_reparse):
         stack.extend(reversed(subdirs))
 
 
+class _Muffled:
+    """Log the first N occurrences of a repetitive warning at WARNING, the
+    rest at DEBUG (file log only gets everything; console stays readable)."""
+
+    def __init__(self, logger, first=20, every=1000):
+        self.logger, self.first, self.every, self.n = logger, first, every, 0
+
+    def warn(self, msg, *args):
+        self.n += 1
+        if self.n <= self.first or self.n % self.every == 0:
+            self.logger.warning(msg + " [#%d]", *args, self.n)
+        else:
+            self.logger.debug(msg, *args)
+
+
 def run_inventory(cfg, root, logger, max_files=None):
-    """Inventory one drive. Returns (rows_written, total_rows). Read-only."""
+    """Inventory one drive. Returns (rows_written, total_rows). Read-only.
+
+    The .done marker is written ONLY after a walk with zero directory-listing
+    failures: a mid-scan USB dropout must leave the inventory resumable, not
+    stamp a partial CSV as complete. A listing failure on the scan root
+    itself aborts - nothing was scanned at all.
+    """
     paths = inventory_paths(cfg, root)
     if os.path.exists(paths["done"]):
         logger.info("inventory for %s already complete (%s)", root, paths["done"])
@@ -118,9 +150,19 @@ def run_inventory(cfg, root, logger, max_files=None):
 
     written = 0
     stopped_early = False
+    walk_errors = 0
+    err_log = _Muffled(logger)
+    reparse_log = _Muffled(logger)
+    root_key = norm_key(root)
 
     def on_error(path, exc):
-        logger.warning("cannot list %s: %s", path, exc)
+        nonlocal walk_errors
+        if norm_key(path) == root_key:
+            raise SystemExit(
+                f"cannot list scan root {root}: {exc}. Is the drive "
+                f"attached and readable? Nothing was scanned.")
+        walk_errors += 1
+        err_log.warn("cannot list %s: %s", path, exc)
 
     def on_reparse(path, entry):
         """Record reparse points without traversing/reading them."""
@@ -129,8 +171,8 @@ def run_inventory(cfg, root, logger, max_files=None):
             is_file = entry.is_file(follow_symlinks=False)
         except OSError:
             is_file = False
-        logger.warning("reparse point skipped (junction/placeholder): %s",
-                       path)
+        reparse_log.warn("reparse point skipped (junction/placeholder): %s",
+                         path)
         if is_file and norm_key(path) not in seen:
             out.write({"path": plain_path(path), "size": "",
                        "created_utc": "", "modified_utc": "",
@@ -151,13 +193,13 @@ def run_inventory(cfg, root, logger, max_files=None):
                     if not statmod.S_ISREG(st.st_mode):
                         continue
                     row["size"] = st.st_size
-                    row["created_utc"] = iso_utc(st.st_ctime)
+                    row["created_utc"] = _created_utc(st)
                     row["modified_utc"] = iso_utc(st.st_mtime)
                 except OSError as exc:
                     row["size"] = ""
                     row["created_utc"] = row["modified_utc"] = ""
                     row["error"] = str(exc)
-                    logger.warning("stat failed for %s: %s", full, exc)
+                    err_log.warn("stat failed for %s: %s", full, exc)
                 ext = os.path.splitext(entry.name)[1].lstrip(".").lower()
                 row["ext"] = ext
                 out.write(row)
@@ -173,7 +215,14 @@ def run_inventory(cfg, root, logger, max_files=None):
             if stopped_early:
                 break
 
-    if not stopped_early:
+    if stopped_early:
+        pass
+    elif walk_errors:
+        logger.warning(
+            "inventory of %s finished with %d unreadable directories - "
+            ".done withheld so a re-run retries them (already-recorded rows "
+            "are skipped on resume)", root, walk_errors)
+    else:
         with open(paths["done"], "w", encoding="utf-8") as fh:
             fh.write("complete\n")
         logger.info("inventory of %s complete: %d new rows", root, written)

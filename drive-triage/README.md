@@ -120,7 +120,22 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-34 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
-repos), run the full pipeline, and assert classification, resume behavior,
-read-only behavior (byte-identical drive trees after a full run), and the
-security properties (no network imports, no delete/rename calls).
+48 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+repos), run the full pipeline, and assert classification, resume behavior
+(including torn-CSV repair), read-only behavior, and the security
+properties (no network imports, no delete/rename calls, guard bypasses).
+
+The Windows-only safety paths (reparse-point skipping, `\\?\` handling,
+volume-identity binding, the system-drive output rule) cannot execute on the
+Linux build environment, so on Windows do one **first supervised run**
+against a small, expendable USB stick and check the log for reparse
+warnings and sane paths before pointing the tool at the real drives.
+
+## Known scale characteristics
+
+- Inventory resume holds one set of already-recorded paths in memory:
+  roughly 0.5 GB per 2M files during the `inventory` command only.
+- Everything else streams; classification memory is proportional to the
+  duplicate-candidate set, not the file count.
+- The drives are assumed static while triage runs; a file changed
+  mid-triage is only re-hashed if its recorded size or mtime changed.

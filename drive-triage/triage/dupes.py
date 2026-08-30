@@ -17,7 +17,9 @@ from collections import defaultdict
 from .util import norm_key
 
 _PATH_HEADERS = ("path", "fullpath", "full_path", "fullname", "full_name",
-                 "filepath", "file_path", "filename")
+                 "filepath", "file_path")
+# NOT "filename": that header conventionally holds a bare basename, which
+# would make every dupe_of reference unverifiable.
 _SIZE_HEADERS = ("size", "size_bytes", "length", "bytes", "filesize",
                  "file_size")
 _FULL_HASH_HEADERS = ("sha256", "full_sha256", "hash", "sha_256", "sha256sum",
@@ -85,22 +87,26 @@ class DReference:
             for row in reader:
                 if len(row) != len(headers):
                     continue
-                raw_size = row[idx[col_size]].strip()
-                if not re.fullmatch(r"\d+", raw_size):
-                    continue
-                size = int(raw_size)
                 path = row[idx[col_path]].strip()
-                if not path or size == 0:
+                if not path:
+                    continue
+                raw_size = row[idx[col_size]].strip()
+                size = int(raw_size) if re.fullmatch(r"\d+", raw_size) \
+                    else None
+                if col_full:
+                    h = row[idx[col_full]].strip().lower()
+                    if re.fullmatch(r"[0-9a-f]{64}", h):
+                        # full-hash matching works even when the size field
+                        # is malformed - don't throw the hash away
+                        ref.by_full[h].append(path)
+                        ref.has_full_hashes = True
+                        ref.row_count += 1 if size is None else 0
+                if size is None or size == 0:
                     continue
                 ref.row_count += 1
                 ref._sizes.add(size)
                 name = os.path.basename(path).casefold()
                 ref.by_size_name[(size, name)].append(path)
-                if col_full:
-                    h = row[idx[col_full]].strip().lower()
-                    if re.fullmatch(r"[0-9a-f]{64}", h):
-                        ref.by_full[h].append(path)
-                        ref.has_full_hashes = True
                 if col_prefix:
                     h = row[idx[col_prefix]].strip().lower()
                     if re.fullmatch(r"[0-9a-f]{64}", h):
@@ -110,6 +116,36 @@ class DReference:
             "D reference loaded: %d rows from %s (full hashes: %s)",
             ref.row_count, csv_path, ref.has_full_hashes)
         return ref
+
+    def drop_paths_under(self, roots, logger):
+        """Remove reference entries that lie under a scan root. If the
+        configured D: reference CSV actually covers a drive being scanned,
+        every file on it would otherwise become an 'exact dupe of D:' of
+        itself - a fabricated delete-candidate for the only copy."""
+        from .util import is_under  # local import avoids a cycle at load
+
+        def keep(path):
+            return not any(is_under(path, r) for r in roots)
+
+        dropped = 0
+        for index in (self.by_full, self.by_prefix, self.by_size_name):
+            for k in list(index):
+                kept = [p for p in index[k] if keep(p)]
+                dropped += len(index[k]) - len(kept)
+                if kept:
+                    index[k] = kept
+                else:
+                    del index[k]
+        if dropped:
+            logger.warning(
+                "D reference: dropped %d entries that lie under a scan root "
+                "(the reference must describe D:, not a drive being "
+                "triaged)", dropped)
+            self._sizes = {k[0] for k in self.by_size_name} | \
+                {k[0] for k in self.by_prefix}
+            self.has_full_hashes = bool(self.by_full)
+            self.has_prefix_hashes = bool(self.by_prefix)
+        return dropped
 
     def has_size(self, size):
         return size in self._sizes
@@ -133,6 +169,7 @@ _TAXONOMY_PAT = re.compile(
 _GENERIC_DIRS = {
     "new folder", "untitled", "misc", "stuff", "temp", "tmp", "desktop",
     "downloads", "backup", "backups", "copy", "old", "unsorted",
+    "cache", "caches",  # never elect the cache-dir copy as the keeper
 }
 
 

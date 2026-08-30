@@ -25,6 +25,7 @@ OLD = time.mktime((2019, 5, 1, 12, 0, 0, 0, 0, -1))
 RECENT = time.time() - 30 * 86400
 
 DUP_CONTENT = b"duplicate-within-e " * 5000        # ~95KB > 64KB prefix
+DUPJ_CONTENT = b"keepme-junkdir-pair " * 4000      # 80KB identical pair
 XDUP_CONTENT = b"cross-drive duplicate " * 4000    # ~88KB
 DREF_CONTENT = b"identical to D reference " * 4000  # ~100KB
 BIG_A = b"A" * (80 * 1024) + b"tail-one"           # same size,
@@ -75,6 +76,27 @@ def build_drive_e(root):
     _w(root, "weird/data.xyz", b"\x00\x01\x02unknown", OLD)
     # sentinel with a globally unique size: must never be hashed at all
     _w(root, "unique/sentinel.bin", b"U" * 7777, OLD)
+    # keeper-vs-junk: identical pair, one copy inside a cache dir - the
+    # cache copy must be the DUPE, and the kept copy must never be junked
+    _w(root, "cache/dupJ.bin", DUPJ_CONTENT, OLD)
+    _w(root, "keep/dupJ.bin", DUPJ_CONTENT, OLD)
+    # real media dumped in a temp-named dir: not junk
+    _w(root, "temp/real_footage.mov", b"real-footage-in-temp-dir-00001", OLD)
+    # 'Personnel' must not trigger the 'personal' shoot keyword
+    _w(root, "Shoots/2022 Personnel Training/video.mp4",
+       b"personnel-training-video-00001x", OLD)
+    # same-named camera files in different card folders of an active project
+    _w(root, "Shoots/2023 Acme Rebrand/RAW/card1/A002.CR2",
+       b"raw-card1-bytes-0001", RECENT)
+    _w(root, "Shoots/2023 Acme Rebrand/RAW/card2/A002.CR2",
+       b"raw-card2-bytes-00001", RECENT)
+    # ordinary '(N)' copy-number files inside a generic History dir must NOT
+    # box the whole tree (only timestamped/backup-tool stores count)
+    for i in (1, 2, 3):
+        _w(root, f"Stuff2/History/photo ({i}).jpg",
+           b"copynum-photo-" + bytes([48 + i]) * (10 + i), OLD)
+    # loose file at drive root
+    _w(root, "LooseClip.mov", b"loose-clip-at-root-bytes-000001", OLD)
 
 
 def build_drive_f(root):

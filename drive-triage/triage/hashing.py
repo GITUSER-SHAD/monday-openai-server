@@ -6,11 +6,21 @@ a SHA256 of their first 64KB ("prefix hash").
 
 Stage 2 (expensive): full SHA256 only where it can decide something -
   * the (size, prefix) group has >= 2 external members, or
-  * the size matches a D: reference entry that carries a full SHA256.
+  * the size matches a D: reference entry carrying a full SHA256 (and, when
+    the reference also carries prefix hashes, only if the prefix matches too).
 Files <= 64KB are finished in stage 1 (prefix hash IS the full hash).
 
 Resume model: per-drive append-only CSVs (prefix-<slug>.csv, full-<slug>.csv);
-on restart, already-hashed paths (matching size) are skipped.
+on restart, already-hashed paths (matching size+mtime) are skipped. There is
+no per-stage short-circuit marker: re-running always re-streams the
+inventories and hashes whatever is missing, so adding a drive later simply
+extends the candidate set convergently. Completion for the downstream gate is
+recorded as a fingerprint of the inventories the hash pass covered
+(hash.done); classify refuses to run when the fingerprint is stale.
+
+A circuit breaker aborts a stage (resumably) after many consecutive open
+failures - a detached drive must fail in seconds, not grind through retry
+backoffs for every remaining file.
 """
 
 import hashlib
@@ -19,12 +29,13 @@ import time
 from collections import Counter
 
 from .util import (
-    HASH_COLUMNS, PREFIX_BYTES, CsvAppender, drive_slug, extended_path,
-    norm_key, read_csv_rows,
+    HASH_COLUMNS, PREFIX_BYTES, CsvAppender, atomic_write_json, drive_slug,
+    extended_path, load_json, norm_key, read_csv_rows,
 )
-from .inventory import iter_inventory
+from .inventory import inventory_paths, iter_inventory
 
 _READ_CHUNK = 1024 * 1024
+_MAX_CONSECUTIVE_FAILURES = 25
 
 
 def hash_paths(cfg, root):
@@ -46,6 +57,26 @@ def _retrying_open(path):
             last = exc
             time.sleep(0.5 * (attempt + 1))  # removable-media hiccup backoff
     raise last
+
+
+class _CircuitBreaker:
+    """Abort (resumably) when every recent file open fails - the drive is
+    gone; per-file retry backoff would otherwise take days on a big drive."""
+
+    def __init__(self, root, stage):
+        self.root, self.stage, self.consecutive = root, stage, 0
+
+    def success(self):
+        self.consecutive = 0
+
+    def failure(self):
+        self.consecutive += 1
+        if self.consecutive >= _MAX_CONSECUTIVE_FAILURES:
+            raise SystemExit(
+                f"{self.stage} stage on {self.root}: "
+                f"{self.consecutive} consecutive read failures - drive "
+                f"detached or unreadable. State is resumable; re-run `hash` "
+                f"when the drive is healthy.")
 
 
 def sha256_prefix(path):
@@ -73,12 +104,17 @@ def sha256_full(path):
 
 
 def _load_hashed(csv_path):
-    """Map norm_key(path) -> (size, hash-row-dict), keeping the last row."""
+    """Map norm_key(path) -> hash-row-dict, keeping the last row per path."""
     out = {}
     if os.path.exists(csv_path):
         for row in read_csv_rows(csv_path, HASH_COLUMNS):
             out[norm_key(row["path"])] = row
     return out
+
+
+def _same_identity(prev, size, mtime):
+    return (prev and not prev["error"] and prev["size"] == size and
+            prev["modified_utc"] == mtime)
 
 
 def collect_size_census(cfg, roots, dref, logger):
@@ -99,8 +135,13 @@ def collect_size_census(cfg, roots, dref, logger):
 
 def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
     """Prefix-hash candidates on one drive. Resumable. Returns rows written."""
+    if not os.path.isdir(root):
+        logger.warning("scan root %s not present; skipping prefix stage "
+                       "(re-run when attached)", root)
+        return 0
     paths = hash_paths(cfg, root)
     done = _load_hashed(paths["prefix"])
+    breaker = _CircuitBreaker(root, "prefix-hash")
     written = 0
     with CsvAppender(paths["prefix"], HASH_COLUMNS, flush_every=200) as out:
         for row in iter_inventory(cfg, root):
@@ -111,9 +152,8 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
                 continue  # zero-byte: classified as junk, not hashed
             if census[size] < 2 and not dref.has_size(size):
                 continue
-            key = norm_key(row["path"])
-            prev = done.get(key)
-            if prev and prev["size"] == row["size"] and not prev["error"]:
+            if _same_identity(done.get(norm_key(row["path"])),
+                              row["size"], row["modified_utc"]):
                 continue
             rec = {"path": row["path"], "size": row["size"],
                    "modified_utc": row["modified_utc"],
@@ -122,10 +162,12 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
                 pre, full = sha256_prefix(row["path"])
                 rec["prefix_sha256"] = pre
                 rec["full_sha256"] = full or ""
+                breaker.success()
             except OSError as exc:
                 rec["error"] = str(exc)
                 logger.warning("prefix hash failed for %s: %s",
                                row["path"], exc)
+                breaker.failure()
             out.write(rec)
             written += 1
             if written % 5000 == 0:
@@ -136,12 +178,25 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
     return written
 
 
+def _iter_prefix_rows(cfg, root):
+    """Stream last-written-wins prefix rows without holding them all: rows
+    are appended, so a re-hashed path appears twice; downstream treats a
+    second occurrence idempotently (the done-map check), so plain streaming
+    is safe and keeps memory flat."""
+    paths = hash_paths(cfg, root)
+    if not os.path.exists(paths["prefix"]):
+        return
+    yield from read_csv_rows(paths["prefix"], HASH_COLUMNS)
+
+
 def collect_prefix_groups(cfg, roots):
-    """Counter over (size:int, prefix_sha256) across all drives' prefix CSVs."""
+    """Counter over (size:int, prefix_sha256) across all drives' prefix CSVs.
+
+    Uses the deduplicated per-path view so a re-hashed file counts once.
+    """
     groups = Counter()
     for root in roots:
-        paths = hash_paths(cfg, root)
-        for row in _load_hashed(paths["prefix"]).values():
+        for row in _load_hashed(hash_paths(cfg, root)["prefix"]).values():
             if row["error"] or not row["prefix_sha256"]:
                 continue
             groups[(int(row["size"]), row["prefix_sha256"])] += 1
@@ -150,11 +205,17 @@ def collect_prefix_groups(cfg, roots):
 
 def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
     """Full-hash files whose prefix group (or D: match) requires it."""
+    if not os.path.isdir(root):
+        logger.warning("scan root %s not present; skipping full stage "
+                       "(re-run when attached)", root)
+        return 0
     paths = hash_paths(cfg, root)
     done = _load_hashed(paths["full"])
+    breaker = _CircuitBreaker(root, "full-hash")
     written = 0
+    seen_this_run = set()
     with CsvAppender(paths["full"], HASH_COLUMNS, flush_every=100) as out:
-        for row in _load_hashed(paths["prefix"]).values():
+        for row in _iter_prefix_rows(cfg, root):
             if row["error"] or not row["prefix_sha256"]:
                 continue
             if row["full_sha256"]:
@@ -162,21 +223,29 @@ def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
             size = int(row["size"])
             need = prefix_groups[(size, row["prefix_sha256"])] >= 2
             if not need and dref.has_full_hashes and dref.has_size(size):
-                need = True
+                # a D: size match forces confirmation - unless the reference
+                # carries prefix hashes proving the prefix already differs
+                need = (not dref.has_prefix_hashes or
+                        bool(dref.by_prefix.get((size, row["prefix_sha256"]))))
             if not need:
                 continue
             key = norm_key(row["path"])
-            prev = done.get(key)
-            if prev and prev["size"] == row["size"] and not prev["error"]:
+            if key in seen_this_run:
+                continue  # duplicate prefix row (file was re-hashed earlier)
+            seen_this_run.add(key)
+            if _same_identity(done.get(key), row["size"],
+                              row["modified_utc"]):
                 continue
             rec = dict(row)
             rec["error"] = ""
             try:
                 rec["full_sha256"] = sha256_full(row["path"])
+                breaker.success()
             except OSError as exc:
                 rec["full_sha256"] = ""
                 rec["error"] = str(exc)
                 logger.warning("full hash failed for %s: %s", row["path"], exc)
+                breaker.failure()
             out.write(rec)
             written += 1
             if written % 1000 == 0:
@@ -187,24 +256,57 @@ def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
     return written
 
 
+# ---------------------------------------------------------------------------
+# Completeness gate: classify must not silently consume a partial hash pass
+# ---------------------------------------------------------------------------
+
+def hash_fingerprint(cfg, roots):
+    """Identity of the inventory set a completed hash pass covered."""
+    fp = []
+    for root in sorted(roots):
+        paths = inventory_paths(cfg, root)
+        rows = sum(1 for _ in read_csv_rows(paths["csv"]))
+        fp.append([drive_slug(root), rows])
+    return fp
+
+
+def _marker_path(cfg):
+    return os.path.join(cfg["output_dir"], "hashes", "hash.done.json")
+
+
+def write_hash_marker(cfg, roots):
+    atomic_write_json(_marker_path(cfg), {"inventories":
+                                          hash_fingerprint(cfg, roots)})
+
+
+def check_hash_marker(cfg, roots):
+    marker = load_json(_marker_path(cfg))
+    current = hash_fingerprint(cfg, roots)
+    if not marker or marker.get("inventories") != current:
+        raise SystemExit(
+            "hashing has not completed for the current inventories "
+            "(interrupted, aborted, or inventories changed since). Run "
+            "`python -m triage hash` to completion, then re-run classify.")
+
+
 def load_all_hashes(cfg, roots):
-    """norm_key(path) -> {"size", "prefix", "full"} merged from both stages."""
+    """norm_key(path) -> {"size", "full"} for files with a FULL hash only.
+
+    Prefix-only entries are useless to classification (dupes require full-
+    hash equality), and skipping them keeps memory proportional to the
+    confirmed-candidate set instead of every size-collision on the drive.
+    """
     merged = {}
     for root in roots:
         paths = hash_paths(cfg, root)
         for key, row in _load_hashed(paths["prefix"]).items():
-            if row["error"]:
+            if row["error"] or not row["full_sha256"]:
                 continue
             merged[key] = {"size": int(row["size"]),
-                           "prefix": row["prefix_sha256"],
-                           "full": row["full_sha256"] or None}
+                           "full": row["full_sha256"]}
         for key, row in _load_hashed(paths["full"]).items():
             if row["error"] or not row["full_sha256"]:
                 continue
-            if key in merged:
-                merged[key]["full"] = row["full_sha256"]
-            else:
-                merged[key] = {"size": int(row["size"]),
-                               "prefix": row["prefix_sha256"],
-                               "full": row["full_sha256"]}
+            merged[key] = {"size": int(row["size"]),
+                           "full": row["full_sha256"]}
     return merged

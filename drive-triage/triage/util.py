@@ -129,19 +129,44 @@ def load_config(path):
 
 def norm_key(path):
     """Canonical form for identity comparisons (Windows is case-insensitive)."""
-    p = os.path.normpath(os.path.abspath(path))
+    p = os.path.normpath(os.path.abspath(plain_path(path)))
     return p.casefold() if IS_WINDOWS else p
 
 
+def normalize_root(root):
+    """Canonical scan-root spelling, fixing hand-typed forms that would
+    break \\\\?\\ access: 'E:' / 'E:/' -> 'E:\\', forward slashes ->
+    backslashes on Windows, a trailing quote from cmd's `--drive "E:\\"`
+    escaping stripped."""
+    r = root.strip().strip('"').strip()
+    if IS_WINDOWS:
+        r = r.replace("/", "\\")
+    if re.fullmatch(r"[A-Za-z]:[\\/]?", r):
+        return r[:2] + "\\"
+    stripped = r.rstrip("\\/")
+    return stripped or r
+
+
 def extended_path(path):
-    """Wrap absolute Windows paths with \\\\?\\ so >260-char paths work."""
+    """Return a form safe for >260-char access on Windows.
+
+    Only absolute drive paths are prefixed, and only after normpath (the
+    \\\\?\\ namespace disables Win32 normalization, so forward slashes or
+    'E:'-style drive-relative forms would make every scandir fail). Short
+    paths are returned un-prefixed - they don't need it.
+    """
     if not IS_WINDOWS:
         return path
     if path.startswith("\\\\?\\"):
         return path
-    if path.startswith("\\\\"):           # UNC
-        return "\\\\?\\UNC\\" + path[2:]
-    return "\\\\?\\" + path
+    p = os.path.normpath(path)
+    if len(p) < 248:
+        return p
+    if p.startswith("\\\\"):              # UNC
+        return "\\\\?\\UNC\\" + p[2:]
+    if re.match(r"^[A-Za-z]:\\", p):
+        return "\\\\?\\" + p
+    return p  # relative path: cannot safely prefix
 
 
 def plain_path(path):
@@ -160,9 +185,11 @@ def is_under(child, parent):
 
 def _canonical(path):
     """Resolve to a canonical real path: realpath resolves symlinks, NTFS
-    junctions and subst mappings, and strips \\\\?\\ spellings - so aliased
-    forms of a scan root cannot slip past the prefix comparison."""
-    return os.path.realpath(plain_path(os.path.abspath(path)))
+    junctions and subst mappings (and makes the path absolute itself, so no
+    lexical abspath first - that would collapse '..' before symlinks are
+    seen), and plain_path strips \\\\?\\ spellings - so aliased forms of a
+    scan root cannot slip past the prefix comparison."""
+    return os.path.realpath(plain_path(path))
 
 
 def _volume_id(path):
@@ -252,9 +279,12 @@ def setup_logging(log_dir, name):
     os.makedirs(log_dir, exist_ok=True)
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
+    for h in list(logger.handlers):
+        h.close()
     logger.handlers.clear()
     fh = logging.FileHandler(
-        os.path.join(log_dir, f"{name}-{now_stamp()}.log"), encoding="utf-8")
+        os.path.join(log_dir, f"{name}-{now_stamp()}.log"), encoding="utf-8",
+        errors="backslashreplace")  # log lines may quote surrogate filenames
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
     fh.setLevel(logging.DEBUG)
     logger.addHandler(fh)
@@ -269,11 +299,39 @@ def setup_logging(log_dir, name):
 # CSV I/O - append-friendly, resume-friendly
 # ---------------------------------------------------------------------------
 
+_CSV_ENC = {"encoding": "utf-8", "errors": "surrogatepass"}
+# surrogatepass: Windows filenames may contain unpaired surrogates; strict
+# utf-8 would crash the write and, because the walk is deterministic, wedge
+# every resume on the same file. surrogatepass round-trips them exactly.
+
+
+def _repair_tail(path):
+    """A crash mid-append can leave the file without a final newline; a new
+    append would glue the next row onto the torn one, silently corrupting
+    BOTH rows. Terminate the torn tail so it becomes a short line that
+    read_csv_rows skips and the resume pass rewrites. Own output files only."""
+    try:
+        with open(path, "rb+") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            if size == 0:
+                return
+            fh.seek(size - 1)
+            if fh.read(1) not in (b"\n", b"\r"):
+                fh.write(b"\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+    except OSError:
+        pass
+
+
 class CsvAppender:
     """Append rows to a CSV, writing the header only on creation.
 
     Rows are flushed (and fsync'd) every `flush_every` rows so a crash loses
-    at most that many rows; resume logic tolerates a torn final line.
+    at most that many rows. On reopen: a missing final newline is repaired, a
+    torn header (crash during creation) is rebuilt, and a header from a
+    different schema is refused rather than mixed.
     """
 
     def __init__(self, path, columns, flush_every=500):
@@ -283,11 +341,30 @@ class CsvAppender:
         self._count = 0
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         exists = os.path.exists(path) and os.path.getsize(path) > 0
-        self._fh = open(path, "a", newline="", encoding="utf-8")
+        if exists:
+            _repair_tail(path)
+            exists = self._validate_header(path)
+        self._fh = open(path, "a" if exists else "w", newline="", **_CSV_ENC)
         self._writer = csv.writer(self._fh)
         if not exists:
-            self._writer.writerow(columns)
+            self._writer.writerow(self.columns)
             self._flush()
+
+    def _validate_header(self, path):
+        with open(path, "r", newline="", **_CSV_ENC) as fh:
+            try:
+                header = next(csv.reader(fh))
+            except (StopIteration, csv.Error):
+                return False
+        header = [h.strip() for h in header]
+        if header == list(self.columns):
+            return True
+        if header == list(self.columns)[:len(header)]:
+            return False  # torn header from a crash during creation: rebuild
+        raise SystemExit(
+            f"{path}: unexpected columns {header!r}; expected "
+            f"{list(self.columns)!r}. Wrong file or produced by a different "
+            f"tool version - refusing to mix.")
 
     def write(self, row_dict):
         self._writer.writerow([row_dict.get(c, "") for c in self.columns])
@@ -310,9 +387,30 @@ class CsvAppender:
         self.close()
 
 
+class CsvRewriter(CsvAppender):
+    """Write a CSV atomically: build <path>.tmp, then os.replace over the
+    target on close. Consumers therefore only ever see a complete file -
+    a crash mid-write leaves the previous version (or nothing) in place."""
+
+    def __init__(self, path, columns):
+        self.final_path = path
+        if os.path.exists(path + ".tmp"):
+            os.remove(path + ".tmp")  # stale temp from a crashed run
+        super().__init__(path + ".tmp", columns, flush_every=5000)
+
+    def close(self):
+        super().close()
+        try:
+            os.replace(self.path, self.final_path)
+        except PermissionError:
+            raise SystemExit(
+                f"cannot replace {self.final_path} - is it open in another "
+                f"program (e.g. Excel)? Close it and re-run.")
+
+
 def read_csv_rows(path, expect_columns=None):
     """Yield dict rows; tolerate a torn final line from a crashed run."""
-    with open(path, "r", newline="", encoding="utf-8-sig", errors="replace") as fh:
+    with open(path, "r", newline="", **_CSV_ENC) as fh:
         reader = csv.reader(fh)
         try:
             header = next(reader)

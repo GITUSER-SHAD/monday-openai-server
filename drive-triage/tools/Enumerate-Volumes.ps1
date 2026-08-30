@@ -43,12 +43,24 @@ $vols = Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
 $vols | Format-Table letter, label, fs, size_gb, used_gb, bus, drive_type,
     model, default_in_scope -AutoSize
 
-# Never write onto a drive that may be triaged: refuse -OutDir on any
-# removable/USB volume or a volume that is in the default scan scope.
-$outDrive = ([System.IO.Path]::GetFullPath($OutDir).Substring(0, 2)).ToUpper()
+# Never write onto a drive that may be triaged. Resolve -OutDir in
+# PowerShell PROVIDER space first: .NET's GetFullPath resolves relative
+# paths against the process CWD, which Set-Location does NOT update in
+# Windows PowerShell 5.1 - the guard and the writes would disagree about
+# where a relative -OutDir points. GetUnresolvedProviderPathFromPSPath
+# resolves against $PWD, exactly as the write cmdlets below will.
+$OutDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutDir)
+$qualifier = Split-Path -Qualifier $OutDir -ErrorAction SilentlyContinue
+if (-not $qualifier) {
+    throw "REFUSING: -OutDir $OutDir has no drive qualifier (UNC paths not supported); use e.g. C:\DEV\triage."
+}
+$outDrive = $qualifier.ToUpper()
 $outVol = $vols | Where-Object { $_.letter -eq $outDrive }
-if ($outVol -and ($outVol.default_in_scope -or
-        $outVol.bus -eq "USB" -or $outVol.drive_type -eq "Removable")) {
+if (-not $outVol) {
+    throw "REFUSING: cannot identify the volume for -OutDir $OutDir; use a local fixed drive like C:\DEV\triage."
+}
+if ($outVol.default_in_scope -or $outVol.bus -eq "USB" -or
+        $outVol.drive_type -eq "Removable") {
     throw ("REFUSING: -OutDir $OutDir is on $outDrive, a drive this triage " +
            "may scan. Point -OutDir at the system drive (e.g. C:\DEV\triage).")
 }
@@ -57,7 +69,7 @@ if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 }
 $json = Join-Path $OutDir "volumes.json"
-$vols | ConvertTo-Json -Depth 3 | Set-Content -Path $json -Encoding UTF8
+@($vols) | ConvertTo-Json -Depth 3 | Set-Content -Path $json -Encoding UTF8
 Write-Host "`nWrote $json"
 Write-Host "C:, D: and network mounts are excluded by default. Approve the"
 Write-Host "final scope via scope.json (python -m triage enumerate) before"
