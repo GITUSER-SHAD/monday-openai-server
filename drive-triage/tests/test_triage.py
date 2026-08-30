@@ -257,8 +257,9 @@ class PipelineTest(unittest.TestCase):
                               ("copy", "hold", "delete-candidate"))
 
     def test_decision_list_contains_ambiguities(self):
-        text = open(os.path.join(self.out, "reports", "decision-list.md"),
-                    encoding="utf-8").read()
+        with open(os.path.join(self.out, "reports", "decision-list.md"),
+                  encoding="utf-8") as fh:
+            text = fh.read()
         self.assertIn("git-repo", text)
         self.assertIn("- **D1**", text)
 
@@ -339,6 +340,57 @@ class GuardTest(unittest.TestCase):
                 "output_dir": "/mnt/ext1/triage-out",
                 "log_dir": "/tmp/logs",
             })
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "no symlinks here")
+    def test_symlink_alias_of_scan_root_refused(self):
+        # an aliased spelling of the scan root must not slip past the guard
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "realroot")
+            os.makedirs(root)
+            alias = os.path.join(base, "alias")
+            os.symlink(root, alias)
+            with self.assertRaises(SystemExit):
+                guard_output_dirs({
+                    "scan_roots": [root],
+                    "output_dir": os.path.join(alias, "out"),
+                    "log_dir": os.path.join(base, "logs"),
+                })
+
+    def test_nothing_created_when_guard_fires(self):
+        # guard failure must abort BEFORE any dir/log is created anywhere
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "driveX")
+            os.makedirs(root)
+            bad_out = os.path.join(root, "triage-out")
+            with self.assertRaises(SystemExit):
+                cli.main(["inventory", "--drive", root,
+                          "--output-dir", bad_out,
+                          "--log-dir", os.path.join(root, "logs")])
+            self.assertEqual(os.listdir(root), [],
+                             "guard fired but something was written to the "
+                             "scanned drive")
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "no symlinks here")
+    def test_symlinked_dir_not_traversed(self):
+        with tempfile.TemporaryDirectory() as base:
+            outside = os.path.join(base, "outside")
+            os.makedirs(outside)
+            with open(os.path.join(outside, "secret.txt"), "wb") as fh:
+                fh.write(b"outside data")
+            root = os.path.join(base, "driveY")
+            os.makedirs(root)
+            with open(os.path.join(root, "inside.txt"), "wb") as fh:
+                fh.write(b"inside data")
+            os.symlink(outside, os.path.join(root, "link"))
+            out = os.path.join(base, "out")
+            run_cli("inventory", "--drive", root, "--output-dir", out,
+                    "--log-dir", os.path.join(base, "logs"))
+            inv = rows_by_path(
+                os.path.join(out, "inventory",
+                             f"inventory-{os.path.basename(root)}.csv"),
+                INVENTORY_COLUMNS)
+            self.assertEqual(len(inv), 1)
+            self.assertNotIn("secret", "".join(inv))
 
     def test_c_and_d_refused_in_scope(self):
         from triage.volumes import load_approved_scope

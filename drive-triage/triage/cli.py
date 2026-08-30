@@ -157,8 +157,15 @@ def main(argv=None):
     if args.drive:
         cfg["scan_roots"] = list(args.drive)
 
-    roots_for_guard = cfg["scan_roots"] or args.drive
-    guard_output_dirs({**cfg, "scan_roots": roots_for_guard})
+    # Guard BEFORE creating any directory or log file. For scanning commands
+    # the roots are fully resolved (scope.json included) right here, so a
+    # guard violation aborts before a single byte lands anywhere; `enumerate`
+    # has no roots yet, but guard_output_dirs still enforces the Windows
+    # system-drive rule for the output/log dirs themselves.
+    if args.command == "enumerate":
+        guard_output_dirs(cfg)
+    else:
+        _resolve_roots(cfg, args, None)  # raises before any write on trouble
 
     os.makedirs(cfg["output_dir"], exist_ok=True)
     logger = setup_logging(cfg["log_dir"], f"triage-{args.command}")

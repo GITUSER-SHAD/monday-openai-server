@@ -42,10 +42,36 @@ def _load_seen(csv_path):
     return seen
 
 
-def _walk_sorted(top, follow_symlinks, on_error):
+def _is_reparse_point(entry):
+    """True for NTFS junctions, mount points, symlinks, cloud placeholders.
+
+    On Windows, DirEntry.is_symlink() is False for junctions and volume mount
+    points, yet is_dir(follow_symlinks=False) is True for them - so a naive
+    walk recurses THROUGH junctions: it can escape the approved scan scope
+    (a preserved junction on a cloned system disk resolves against the live
+    machine), loop forever on junction cycles, and catalog one physical file
+    under two paths (which would fabricate a false delete-candidate dupe).
+    Reparse-point files (OneDrive/dedup placeholders) must not be opened
+    either: reading can trigger hydration. Everything reparse is therefore
+    skipped for dirs and recorded-but-not-read for files.
+    """
+    try:
+        st = entry.stat(follow_symlinks=False)
+    except OSError:
+        return True  # cannot prove it is safe to traverse - do not
+    if getattr(st, "st_reparse_tag", 0):
+        return True
+    attrs = getattr(st, "st_file_attributes", 0)
+    reparse_flag = getattr(statmod, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    return bool(attrs & reparse_flag)
+
+
+def _walk_sorted(top, follow_symlinks, on_error, on_reparse):
     """Deterministic DFS yielding (dirpath, [file DirEntries]).
 
     Directory listing errors are reported via on_error and the dir skipped.
+    Reparse-point entries are never traversed; files that are reparse points
+    are reported via on_reparse instead of being yielded for reading.
     """
     stack = [top]
     while stack:
@@ -58,17 +84,21 @@ def _walk_sorted(top, follow_symlinks, on_error):
             continue
         files, subdirs = [], []
         for e in entries:
+            full = os.path.join(d, e.name)
             try:
                 if e.is_symlink() and not follow_symlinks:
+                    continue
+                if _is_reparse_point(e):
+                    on_reparse(full, e)
                     continue
                 if e.is_dir(follow_symlinks=follow_symlinks):
                     if e.name.casefold() in SKIP_DIR_NAMES:
                         continue
-                    subdirs.append(os.path.join(d, e.name))
+                    subdirs.append(full)
                 elif e.is_file(follow_symlinks=follow_symlinks):
                     files.append(e)
             except OSError as exc:
-                on_error(os.path.join(d, e.name), exc)
+                on_error(full, exc)
         yield d, files
         # push reversed so DFS visits subdirs in sorted order
         stack.extend(reversed(subdirs))
@@ -92,8 +122,25 @@ def run_inventory(cfg, root, logger, max_files=None):
     def on_error(path, exc):
         logger.warning("cannot list %s: %s", path, exc)
 
+    def on_reparse(path, entry):
+        """Record reparse points without traversing/reading them."""
+        nonlocal written
+        try:
+            is_file = entry.is_file(follow_symlinks=False)
+        except OSError:
+            is_file = False
+        logger.warning("reparse point skipped (junction/placeholder): %s",
+                       path)
+        if is_file and norm_key(path) not in seen:
+            out.write({"path": plain_path(path), "size": "",
+                       "created_utc": "", "modified_utc": "",
+                       "ext": os.path.splitext(path)[1].lstrip(".").lower(),
+                       "error": "reparse-point file (not read)"})
+            written += 1
+
     with CsvAppender(paths["csv"], INVENTORY_COLUMNS) as out:
-        for dirpath, files in _walk_sorted(root, cfg["follow_symlinks"], on_error):
+        for dirpath, files in _walk_sorted(root, cfg["follow_symlinks"],
+                                           on_error, on_reparse):
             for entry in files:
                 full = os.path.join(dirpath, entry.name)
                 if norm_key(full) in seen:

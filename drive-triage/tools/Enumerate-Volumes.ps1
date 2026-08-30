@@ -43,6 +43,16 @@ $vols = Get-Volume | Where-Object { $_.DriveLetter } | ForEach-Object {
 $vols | Format-Table letter, label, fs, size_gb, used_gb, bus, drive_type,
     model, default_in_scope -AutoSize
 
+# Never write onto a drive that may be triaged: refuse -OutDir on any
+# removable/USB volume or a volume that is in the default scan scope.
+$outDrive = ([System.IO.Path]::GetFullPath($OutDir).Substring(0, 2)).ToUpper()
+$outVol = $vols | Where-Object { $_.letter -eq $outDrive }
+if ($outVol -and ($outVol.default_in_scope -or
+        $outVol.bus -eq "USB" -or $outVol.drive_type -eq "Removable")) {
+    throw ("REFUSING: -OutDir $OutDir is on $outDrive, a drive this triage " +
+           "may scan. Point -OutDir at the system drive (e.g. C:\DEV\triage).")
+}
+
 if (-not (Test-Path $OutDir)) {
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 }

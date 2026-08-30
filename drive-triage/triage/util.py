@@ -101,6 +101,9 @@ DEFAULT_CONFIG = {
     "personal_shoot_keywords": [
         "personal", "family", "vacation", "holiday", "wedding own", "home video",
     ],
+    # On Windows, output/log dirs must live on the system drive (C:) unless
+    # this is explicitly set true - external drives are strictly read-only.
+    "allow_output_off_system_drive": False,
     # Known client codes, e.g. {"ACME": "Acme Corp"} -> Records\Business\Clients\ACME Acme Corp
     "client_codes": {},
     "checkpoint_every_files": 2000,
@@ -155,15 +158,64 @@ def is_under(child, parent):
     return c == p or c.startswith(p.rstrip("\\/") + os.sep)
 
 
+def _canonical(path):
+    """Resolve to a canonical real path: realpath resolves symlinks, NTFS
+    junctions and subst mappings, and strips \\\\?\\ spellings - so aliased
+    forms of a scan root cannot slip past the prefix comparison."""
+    return os.path.realpath(plain_path(os.path.abspath(path)))
+
+
+def _volume_id(path):
+    """st_dev of the nearest existing ancestor (volume serial on Windows)."""
+    p = _canonical(path)
+    while True:
+        try:
+            return os.stat(p).st_dev
+        except OSError:
+            parent = os.path.dirname(p)
+            if parent == p:
+                return None
+            p = parent
+
+
+_DRIVE_ROOT = re.compile(r"^[A-Za-z]:[\\/]?$")
+
+
 def guard_output_dirs(cfg):
-    """Refuse to run if output/log dirs sit under any scan root (read-only rule)."""
-    for root in cfg["scan_roots"]:
+    """Refuse to run if output/log dirs could land on a scanned drive.
+
+    Two independent checks per (scan root, output dir) pair:
+      1. canonical-path prefix (realpath both sides, defeating \\\\?\\ / UNC /
+         subst / junction aliases of the same location);
+      2. when the scan root is a whole drive (E:\\), volume identity - any
+         output dir whose nearest existing ancestor lives on that volume is
+         refused even if its path spells the location differently.
+    """
+    if IS_WINDOWS and not cfg.get("allow_output_off_system_drive"):
+        sys_vol = _volume_id(os.environ.get("SystemDrive", "C:") + "\\")
         for name in ("output_dir", "log_dir"):
-            if is_under(cfg[name], root):
+            if sys_vol is not None and _volume_id(cfg[name]) != sys_vol:
                 raise SystemExit(
-                    f"REFUSING TO RUN: {name} ({cfg[name]}) is inside scan root "
-                    f"{root}. Scanned drives are strictly read-only; point "
-                    f"{name} at a directory on the system drive."
+                    f"REFUSING TO RUN: {name} ({cfg[name]}) is not on the "
+                    f"system drive. External drives are strictly read-only; "
+                    f"keep outputs on C: (or set "
+                    f"allow_output_off_system_drive in the config if you "
+                    f"know the target volume is safe)."
+                )
+    for root in cfg["scan_roots"]:
+        root_canon = _canonical(root)
+        whole_drive = bool(_DRIVE_ROOT.match(root.strip()))
+        root_vol = _volume_id(root) if whole_drive else None
+        for name in ("output_dir", "log_dir"):
+            target = cfg[name]
+            offending = is_under(_canonical(target), root_canon)
+            if not offending and whole_drive and root_vol is not None:
+                offending = _volume_id(target) == root_vol
+            if offending:
+                raise SystemExit(
+                    f"REFUSING TO RUN: {name} ({target}) resolves onto scan "
+                    f"root {root}. Scanned drives are strictly read-only; "
+                    f"point {name} at a directory on the system drive."
                 )
 
 
