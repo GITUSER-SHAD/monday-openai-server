@@ -32,7 +32,9 @@ from .util import (
     HASH_COLUMNS, PREFIX_BYTES, CsvAppender, atomic_write_json, drive_slug,
     extended_path, load_json, norm_key, read_csv_rows,
 )
-from .inventory import inventory_paths, iter_inventory
+from .inventory import (
+    _Muffled, _is_permission_error, inventory_paths, iter_inventory,
+)
 
 _READ_CHUNK = 1024 * 1024
 _MAX_CONSECUTIVE_FAILURES = 25
@@ -61,15 +63,23 @@ def _retrying_open(path):
 
 class _CircuitBreaker:
     """Abort (resumably) when every recent file open fails - the drive is
-    gone; per-file retry backoff would otherwise take days on a big drive."""
+    gone; per-file retry backoff would otherwise take days on a big drive.
+
+    Permission denials never count: files locked to SYSTEM (Windows crypto
+    MachineKeys, service state) are permanently unreadable by design and
+    can appear in long consecutive runs, which is not a failing drive.
+    """
 
     def __init__(self, root, stage):
-        self.root, self.stage, self.consecutive = root, stage, 0
+        self.root, self.stage, self.consecutive, self.denied = root, stage, 0, 0
 
     def success(self):
         self.consecutive = 0
 
-    def failure(self):
+    def failure(self, exc=None):
+        if exc is not None and _is_permission_error(exc):
+            self.denied += 1
+            return
         self.consecutive += 1
         if self.consecutive >= _MAX_CONSECUTIVE_FAILURES:
             raise SystemExit(
@@ -142,6 +152,7 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
     paths = hash_paths(cfg, root)
     done = _load_hashed(paths["prefix"])
     breaker = _CircuitBreaker(root, "prefix-hash")
+    err_log = _Muffled(logger)
     written = 0
     with CsvAppender(paths["prefix"], HASH_COLUMNS, flush_every=200) as out:
         for row in iter_inventory(cfg, root):
@@ -165,9 +176,9 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
                 breaker.success()
             except OSError as exc:
                 rec["error"] = str(exc)
-                logger.warning("prefix hash failed for %s: %s",
-                               row["path"], exc)
-                breaker.failure()
+                err_log.warn("prefix hash failed for %s: %s",
+                             row["path"], exc)
+                breaker.failure(exc)
             out.write(rec)
             written += 1
             if written % 5000 == 0:
@@ -175,6 +186,10 @@ def run_prefix_stage(cfg, root, census, dref, logger, max_files=None):
             if max_files is not None and written >= max_files:
                 logger.info("prefix stage stopping at max_files (resumable)")
                 break
+    if breaker.denied:
+        logger.warning("%s: %d file(s) unreadable due to permissions during "
+                       "prefix hashing - recorded with an error, excluded "
+                       "from duplicate detection", root, breaker.denied)
     return written
 
 
@@ -212,6 +227,7 @@ def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
     paths = hash_paths(cfg, root)
     done = _load_hashed(paths["full"])
     breaker = _CircuitBreaker(root, "full-hash")
+    err_log = _Muffled(logger)
     written = 0
     seen_this_run = set()
     with CsvAppender(paths["full"], HASH_COLUMNS, flush_every=100) as out:
@@ -244,8 +260,8 @@ def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
             except OSError as exc:
                 rec["full_sha256"] = ""
                 rec["error"] = str(exc)
-                logger.warning("full hash failed for %s: %s", row["path"], exc)
-                breaker.failure()
+                err_log.warn("full hash failed for %s: %s", row["path"], exc)
+                breaker.failure(exc)
             out.write(rec)
             written += 1
             if written % 1000 == 0:

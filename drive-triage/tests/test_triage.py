@@ -394,6 +394,23 @@ class UnreadableDirTest(unittest.TestCase):
                 os.chmod(os.path.join(root, "locked"), 0o700)
 
 
+class CircuitBreakerTest(unittest.TestCase):
+    def test_permission_errors_never_trip_breaker(self):
+        from triage.hashing import _CircuitBreaker
+        b = _CircuitBreaker("F:\\", "prefix-hash")
+        for _ in range(500):  # far past the trip threshold
+            b.failure(PermissionError(13, "Access is denied"))
+        self.assertEqual(b.denied, 500)
+        self.assertEqual(b.consecutive, 0)
+
+    def test_device_errors_still_trip_breaker(self):
+        from triage.hashing import _CircuitBreaker
+        b = _CircuitBreaker("F:\\", "prefix-hash")
+        with self.assertRaises(SystemExit):
+            for _ in range(100):
+                b.failure(OSError(5, "I/O error"))
+
+
 class DRefWithoutHashesTest(unittest.TestCase):
     def test_probable_dupe_flagged_and_hash_request_written(self):
         with tempfile.TemporaryDirectory() as base:
