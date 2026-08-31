@@ -1,31 +1,54 @@
 @echo off
 setlocal
 title Drive Triage
+cd /d "%~dp0"
 echo.
 echo  DRIVE TRIAGE
 echo  ============
 echo.
-set /p DRIVE="Drive letter to triage (example: F), then Enter: "
+echo  Enter EITHER a drive letter (example: F)
+echo  OR a network path      (example: \\100.76.11.114\fastwork)
 echo.
-echo  Name this drive - used for its report folder, so two drives that
-echo  share a letter never overwrite each other (example: Samsung_T5)
+set /p TARGET="Target, then Enter: "
 echo.
-set /p NAME="Name for this drive, then Enter: "
+echo  Name this target - used for its report folder, so two drives that
+echo  share a letter never overwrite each other (example: NAS_fastwork)
 echo.
-vol %DRIVE%:
+set /p NAME="Name for this target, then Enter: "
 echo.
-echo Running triage on %DRIVE%: as "%NAME%" ...
-echo (This can sit with no new text for several minutes on a big drive -
+if "%TARGET:~1%"=="" vol %TARGET%:
+echo.
+echo Checking the target is reachable...
+python -m triage probe --config triage-config.json --drive "%TARGET%"
+if errorlevel 1 (
+  echo.
+  echo ============================================
+  echo CANNOT REACH THE TARGET - nothing was scanned.
+  echo See the message above.
+  echo ============================================
+  echo.
+  pause
+  exit /b 1
+)
+echo.
+echo ============================================
+echo Above is what will be scanned. If that looks
+echo wrong, close this window now to cancel.
+echo ============================================
+echo.
+pause
+echo.
+echo Running triage on %TARGET% as "%NAME%" ...
+echo (This can sit with no new text for several minutes on a big target -
 echo  that is normal. Do NOT close this window. It is done only when you
 echo  see "Press any key to continue" below.)
 echo.
-cd /d "%~dp0"
-python -m triage all --config triage-config.json --drive %DRIVE%:\ --output-dir "C:\DEV\triage\%NAME%"
+python -m triage all --config triage-config.json --drive "%TARGET%" --output-dir "C:\DEV\triage\%NAME%"
 echo.
 if errorlevel 1 (
   echo ============================================
   echo FAILED - see the error message above.
-  echo Nothing on %DRIVE%: was touched. Send this
+  echo Nothing on %TARGET% was touched. Send this
   echo window's text to Claude to fix it.
   echo ============================================
 ) else (

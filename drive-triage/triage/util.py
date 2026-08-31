@@ -133,16 +133,27 @@ def norm_key(path):
     return p.casefold() if IS_WINDOWS else p
 
 
+def is_unc(path):
+    r"""True for a UNC share path (\\server\share[\...])."""
+    p = path.replace("/", "\\") if IS_WINDOWS else path
+    return bool(re.match(r"^\\\\[^\\]+\\[^\\]+", p))
+
+
 def normalize_root(root):
     """Canonical scan-root spelling, fixing hand-typed forms that would
-    break \\\\?\\ access: 'E:' / 'E:/' -> 'E:\\', forward slashes ->
+    break \\\\?\\ access: 'E' / 'E:' / 'E:/' -> 'E:\\', forward slashes ->
     backslashes on Windows, a trailing quote from cmd's `--drive "E:\\"`
-    escaping stripped."""
+    escaping stripped. UNC shares keep their leading double backslash;
+    only a trailing separator is trimmed."""
     r = root.strip().strip('"').strip()
     if IS_WINDOWS:
         r = r.replace("/", "\\")
+    if re.fullmatch(r"[A-Za-z]", r):          # bare drive letter typed
+        return r.upper() + ":\\"
     if re.fullmatch(r"[A-Za-z]:[\\/]?", r):
         return r[:2] + "\\"
+    if is_unc(r):
+        return "\\\\" + r.lstrip("\\").rstrip("\\/")
     stripped = r.rstrip("\\/")
     return stripped or r
 
@@ -221,6 +232,10 @@ def guard_output_dirs(cfg):
     if IS_WINDOWS and not cfg.get("allow_output_off_system_drive"):
         sys_vol = _volume_id(os.environ.get("SystemDrive", "C:") + "\\")
         for name in ("output_dir", "log_dir"):
+            if is_unc(cfg[name]):
+                raise SystemExit(
+                    f"REFUSING TO RUN: {name} ({cfg[name]}) is a network "
+                    f"path. Outputs must stay on the system drive.")
             if sys_vol is not None and _volume_id(cfg[name]) != sys_vol:
                 raise SystemExit(
                     f"REFUSING TO RUN: {name} ({cfg[name]}) is not on the "
@@ -247,10 +262,15 @@ def guard_output_dirs(cfg):
 
 
 def drive_slug(root):
-    """Stable per-drive identifier for output filenames: 'E' or dir basename."""
+    """Stable per-target identifier for output filenames: 'E' for a drive
+    letter, the share name for a UNC path, else the directory basename."""
     root = root.rstrip("\\/")
     if re.fullmatch(r"[A-Za-z]:", root):
         return root[0].upper()
+    if is_unc(root):
+        parts = [p for p in root.lstrip("\\").split("\\") if p]
+        if len(parts) >= 2:                  # \\server\share -> "share"
+            return re.sub(r"[^A-Za-z0-9_-]+", "_", parts[1])
     slug = re.sub(r"[^A-Za-z0-9_-]+", "_", os.path.basename(root) or root)
     return slug or "drive"
 

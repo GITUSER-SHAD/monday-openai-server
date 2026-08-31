@@ -578,6 +578,43 @@ class GuardTest(unittest.TestCase):
                 load_approved_scope(p)
 
 
+class UncTargetTest(unittest.TestCase):
+    def test_normalize_keeps_unc_and_expands_bare_letter(self):
+        from triage.util import is_unc, normalize_root
+        self.assertTrue(is_unc(r"\\100.76.11.114\fastwork"))
+        self.assertFalse(is_unc(r"\\100.76.11.114"))
+        self.assertFalse(is_unc("E:\\"))
+        self.assertEqual(normalize_root(r"\\100.76.11.114\fastwork\ "),
+                         r"\\100.76.11.114\fastwork")
+        self.assertEqual(normalize_root(r'"\\100.76.11.114\video"'),
+                         r"\\100.76.11.114\video")
+
+    def test_slug_is_share_name(self):
+        from triage.util import drive_slug
+        for share in ("fastwork", "video", "data", "photos", "backups"):
+            self.assertEqual(
+                drive_slug(rf"\\100.76.11.114\{share}"), share)
+
+    def test_incomplete_unc_refused(self):
+        with tempfile.TemporaryDirectory() as base:
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(["probe", "--drive", r"\\100.76.11.114",
+                          "--output-dir", os.path.join(base, "out"),
+                          "--log-dir", os.path.join(base, "logs")])
+            self.assertIn("server", str(ctx.exception))
+
+    def test_unreachable_target_fails_loudly(self):
+        with tempfile.TemporaryDirectory() as base:
+            with self.assertRaises(SystemExit) as ctx:
+                cli.main(["inventory", "--drive",
+                          r"\\10.255.255.1\nosuchshare",
+                          "--output-dir", os.path.join(base, "out"),
+                          "--log-dir", os.path.join(base, "logs")])
+            msg = str(ctx.exception)
+            self.assertIn("cannot reach", msg)
+            self.assertIn("Administrator session", msg)
+
+
 class SystemBoxTest(unittest.TestCase):
     def test_profile_layout_at_drive_root_boxed_media_untouched(self):
         with tempfile.TemporaryDirectory() as base:

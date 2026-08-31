@@ -1,7 +1,8 @@
 """Command-line entry point.
 
   python -m triage enumerate  [--config triage-config.json]
-  python -m triage inventory  [--drive E:\\] ...
+  python -m triage probe      --drive \\\\server\\share   (reachability check)
+  python -m triage inventory  [--drive E:\\ | --drive \\\\server\\share] ...
   python -m triage hash
   python -m triage classify
   python -m triage report
@@ -19,8 +20,8 @@ from datetime import datetime, timedelta, timezone
 
 from . import __version__
 from .util import (
-    IS_WINDOWS, atomic_write_json, guard_output_dirs, is_under, load_config,
-    load_json, normalize_root, setup_logging,
+    IS_WINDOWS, atomic_write_json, drive_slug, fmt_gb, guard_output_dirs,
+    is_unc, is_under, load_config, load_json, normalize_root, setup_logging,
 )
 from . import volumes as volumes_mod
 from .inventory import inventory_paths, run_inventory
@@ -56,6 +57,11 @@ def _resolve_roots(cfg, args, logger):
             raise SystemExit(
                 f"scan root {r!r}: C: and D: are excluded from triage by "
                 f"design (D: is mid-reorg; C: is the system drive).")
+        if n.startswith("\\\\") and not is_unc(n):
+            raise SystemExit(
+                f"scan root {r!r} looks like a network path but is not a "
+                f"complete share. Use the form \\\\server\\share, e.g. "
+                f"\\\\100.76.11.114\\fastwork")
         k = n.casefold() if IS_WINDOWS else n
         if k not in seen:
             seen.add(k)
@@ -97,6 +103,68 @@ def _verify_volume_identity(cfg, roots, logger):
                 f"{inventory_paths(cfg, root)['slug']}* outputs first.")
 
 
+def _require_reachable(roots, logger):
+    """Fail loudly when a named target cannot be reached, instead of quietly
+    scanning nothing. A network share that is offline, refusing credentials,
+    or (when running elevated) mapped only in the non-elevated session is
+    the common cause."""
+    missing = [r for r in roots if not os.path.isdir(r)]
+    if not missing:
+        return
+    if len(missing) == len(roots):
+        detail = "\n".join(f"  {m}" for m in missing)
+        hint = ""
+        if any(is_unc(m) for m in missing):
+            hint = (
+                "\n\nThis is a network path. Check that the NAS is on and "
+                "reachable, and that the share name is spelled exactly "
+                "right. Note that a drive letter mapped in your normal "
+                "session (U:, V:, X:, Y:, Z:) does NOT exist in an "
+                "Administrator session - that is why the full "
+                "\\\\server\\share path is used here.")
+        raise SystemExit(f"cannot reach:\n{detail}{hint}")
+    for m in missing:
+        logger.warning("target %s not reachable; skipping", m)
+
+
+def cmd_probe(cfg, args, logger):
+    """Read-only reachability check: confirm the target resolves and show
+    its top-level contents, so a full scan is never started blind."""
+    roots = _resolve_roots(cfg, args, logger)
+    rc = 0
+    for root in roots:
+        print(f"\nTarget: {root}")
+        print(f"Report files will be named for: {drive_slug(root)}")
+        if not os.path.isdir(root):
+            print("  NOT REACHABLE")
+            rc = 1
+            continue
+        try:
+            with os.scandir(root) as it:
+                entries = sorted(it, key=lambda e: e.name)
+        except OSError as exc:
+            print(f"  reachable but cannot be listed: {exc}")
+            rc = 1
+            continue
+        dirs, files, fbytes = [], 0, 0
+        for e in entries:
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    dirs.append(e.name)
+                elif e.is_file(follow_symlinks=False):
+                    files += 1
+                    fbytes += e.stat(follow_symlinks=False).st_size
+            except OSError:
+                pass
+        print(f"  REACHABLE - {len(dirs)} top-level folders, "
+              f"{files} loose files ({fmt_gb(fbytes)})")
+        for d in dirs:
+            print(f"    [DIR]  {d}")
+        if not dirs and not files:
+            print("    (empty)")
+    return rc
+
+
 def _dref(cfg, logger):
     return DReference.load(cfg["d_reference_csv"], logger)
 
@@ -112,6 +180,7 @@ def cmd_enumerate(cfg, args, logger):
 
 def cmd_inventory(cfg, args, logger):
     roots = _resolve_roots(cfg, args, logger)
+    _require_reachable(roots, logger)
     _verify_volume_identity(cfg, roots, logger)
     for root in roots:
         if not os.path.isdir(root):
@@ -181,6 +250,7 @@ def cmd_all(cfg, args, logger):
 
 COMMANDS = {
     "enumerate": cmd_enumerate,
+    "probe": cmd_probe,
     "inventory": cmd_inventory,
     "hash": cmd_hash,
     "classify": cmd_classify,
@@ -196,7 +266,9 @@ def main(argv=None):
     ap.add_argument("command", choices=sorted(COMMANDS))
     ap.add_argument("--config", default="", help="path to triage-config.json")
     ap.add_argument("--drive", action="append", default=[],
-                    help="scan root (repeatable); overrides scope/config")
+                    help="scan target: drive letter (E, E:, E:\\) or UNC "
+                         "share (\\\\server\\share). Repeatable; overrides "
+                         "scope/config")
     ap.add_argument("--output-dir", default="", help="override output_dir")
     ap.add_argument("--log-dir", default="", help="override log_dir")
     ap.add_argument("--d-reference", default="",
@@ -220,7 +292,7 @@ def main(argv=None):
     # guard violation aborts before a single byte lands anywhere; `enumerate`
     # guards against an existing approved scope plus the Windows
     # system-drive rule for the output/log dirs themselves.
-    if args.command == "enumerate":
+    if args.command in ("enumerate", "probe"):
         scope_path = os.path.join(cfg["output_dir"], "scope.json")
         roots = []
         if os.path.exists(scope_path):
