@@ -664,6 +664,74 @@ class UnitTest(unittest.TestCase):
             {"letter": "E:", "drive_type": "Fixed", "bus": "USB"}))
 
 
+class CrossDriveTest(unittest.TestCase):
+    """Several physical drives were all mounted as F:, so the comparison
+    must key on content hash and attribute copies by run-folder name."""
+
+    def _mkrun(self, ws, name, files):
+        from triage.util import CsvAppender
+        inv = os.path.join(ws, name, "inventory", "inventory-F.csv")
+        with CsvAppender(inv, INVENTORY_COLUMNS) as w:
+            for p, s, _ in files:
+                w.write({"path": p, "size": s, "ext": "mp4", "error": "",
+                         "created_utc": "2020-01-01T00:00:00Z",
+                         "modified_utc": "2020-01-01T00:00:00Z"})
+        with open(os.path.join(ws, name, "inventory", "inventory-F.done"),
+                  "w") as fh:
+            fh.write("complete\n")
+        with CsvAppender(os.path.join(ws, name, "hashes", "full-F.csv"),
+                         HASH_COLUMNS) as w:
+            for p, s, sha in files:
+                if sha:
+                    w.write({"path": p, "size": s, "prefix_sha256": sha,
+                             "full_sha256": sha, "error": "",
+                             "modified_utc": "2020-01-01T00:00:00Z"})
+
+    def test_finds_dupes_across_drives_sharing_a_letter(self):
+        import hashlib
+        import logging
+        from triage import crossdrive
+        shared = hashlib.sha256(b"shared").hexdigest()
+        solo = hashlib.sha256(b"solo").hexdigest()
+        with tempfile.TemporaryDirectory() as ws:
+            # identical path strings on two different physical drives
+            self._mkrun(ws, "DriveOne", [
+                (r"F:\Videos\clip.mp4", 5_000_000_000, shared),
+                (r"F:\Videos\solo.mp4", 900_000_000, solo),
+                (r"F:\gap.mp4", 123_456_789, None),
+            ])
+            self._mkrun(ws, "DriveTwo", [
+                (r"F:\Backup\clip.mp4", 5_000_000_000, shared),
+                (r"F:\twin.mp4", 123_456_789, None),
+            ])
+            log = logging.getLogger("cdtest")
+            log.addHandler(logging.NullHandler())
+            res = crossdrive.analyze(ws, log)
+            self.assertEqual(res["groups"], 1)
+            self.assertEqual(res["reclaimable"], 5_000_000_000)
+            # the size-unique-per-drive pair is reported as uncompared
+            self.assertEqual(res["gap_files"], 2)
+            rows = list(read_csv_rows(res["groups_csv"],
+                                      ["sha256", "size", "copies",
+                                       "drives", "paths"]))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["drives"], "DriveOne | DriveTwo")
+            self.assertIn("[DriveOne] F:\\Videos\\clip.mp4", rows[0]["paths"])
+            self.assertIn("[DriveTwo] F:\\Backup\\clip.mp4", rows[0]["paths"])
+            # the file present on only one drive is not reported
+            self.assertNotIn(solo, rows[0]["sha256"])
+
+    def test_refuses_with_fewer_than_two_runs(self):
+        import logging
+        from triage import crossdrive
+        with tempfile.TemporaryDirectory() as ws:
+            self._mkrun(ws, "OnlyOne", [(r"F:\a.mp4", 10, None)])
+            log = logging.getLogger("cdtest2")
+            log.addHandler(logging.NullHandler())
+            with self.assertRaises(SystemExit):
+                crossdrive.analyze(ws, log)
+
+
 class SecurityTest(unittest.TestCase):
     PKG = os.path.join(os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))), "triage")
@@ -695,7 +763,9 @@ class SecurityTest(unittest.TestCase):
 
     def test_no_delete_or_rename_of_scanned_paths(self):
         # os.remove/os.replace are permitted only on regenerated outputs.
-        allowed = {"classify.py": 1, "report.py": 1, "util.py": 1}
+        # each: removing one of the tool's OWN regenerated output files
+        allowed = {"classify.py": 1, "report.py": 1, "util.py": 1,
+                   "crossdrive.py": 1}
         for fn, src in self._sources():
             removes = src.count("os.remove(") + src.count("os.rename(") \
                 + src.count("os.unlink(")

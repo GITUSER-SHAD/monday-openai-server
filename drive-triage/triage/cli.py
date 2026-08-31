@@ -32,6 +32,7 @@ from .hashing import (
 from .dupes import DReference
 from .classify import run_classify
 from .report import run_reports
+from . import crossdrive
 
 
 def _resolve_roots(cfg, args, logger):
@@ -240,6 +241,26 @@ def cmd_report(cfg, args, logger):
     return 0
 
 
+def cmd_crossdrive(cfg, args, logger):
+    """Compare every completed run in the workspace against each other."""
+    workspace = args.workspace or os.path.dirname(
+        cfg["output_dir"].rstrip("\\/")) or cfg["output_dir"]
+    if not os.path.isdir(workspace):
+        raise SystemExit(f"workspace not found: {workspace}")
+    logger.info("cross-drive analysis over %s", workspace)
+    res = crossdrive.analyze(workspace, logger)
+    print(f"\nCompared {len(res['runs'])} drives: {', '.join(res['runs'])}")
+    print(f"{res['groups']:,} pieces of content exist on more than one drive")
+    print(f"{fmt_gb(res['reclaimable'])} reclaimable by keeping one copy "
+          f"of each")
+    if res["gap_files"]:
+        print(f"{res['gap_files']:,} files could not be compared "
+              f"(never hashed) - see the report's Coverage section")
+    print(f"\nwrote {res['report']}")
+    print(f"wrote {res['groups_csv']}")
+    return 0
+
+
 def cmd_all(cfg, args, logger):
     cmd_inventory(cfg, args, logger)
     cmd_hash(cfg, args, logger)
@@ -255,6 +276,7 @@ COMMANDS = {
     "hash": cmd_hash,
     "classify": cmd_classify,
     "report": cmd_report,
+    "crossdrive": cmd_crossdrive,
     "all": cmd_all,
 }
 
@@ -275,6 +297,9 @@ def main(argv=None):
                     help="override d_reference_csv")
     ap.add_argument("--max-files", type=int, default=None,
                     help="stop each stage after N new rows (testing/resume)")
+    ap.add_argument("--workspace", default="",
+                    help="crossdrive: folder containing all run folders "
+                         "(default: parent of output_dir)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -292,7 +317,10 @@ def main(argv=None):
     # guard violation aborts before a single byte lands anywhere; `enumerate`
     # guards against an existing approved scope plus the Windows
     # system-drive rule for the output/log dirs themselves.
-    if args.command in ("enumerate", "probe"):
+    if args.command == "crossdrive":
+        # reads only completed run folders; no scan target involved
+        guard_output_dirs({**cfg, "scan_roots": []})
+    elif args.command in ("enumerate", "probe"):
         scope_path = os.path.join(cfg["output_dir"], "scope.json")
         roots = []
         if os.path.exists(scope_path):
