@@ -13,6 +13,7 @@ the inventory is still complete-by-path and the failure is visible.
 import errno
 import os
 import stat as statmod
+import time
 
 from .util import (
     INVENTORY_COLUMNS, CsvAppender, drive_slug, extended_path, iso_utc,
@@ -23,6 +24,10 @@ from .util import (
 SKIP_DIR_NAMES = {
     "$recycle.bin", "system volume information", "$windows.~bt", "msocache",
 }
+
+# Above this many directories failing to list (after retries), assume the
+# device/share is gone rather than that many individually bad folders.
+_MAX_UNREADABLE_DIRS = 25
 
 
 def inventory_paths(cfg, root):
@@ -97,11 +102,21 @@ def _walk_sorted(top, follow_symlinks, on_error, on_reparse):
     stack = [top]
     while stack:
         d = stack.pop()
-        try:
-            with os.scandir(extended_path(d)) as it:
-                entries = sorted(it, key=lambda e: e.name)
-        except OSError as exc:
-            on_error(d, exc)
+        entries = None
+        last_exc = None
+        # A single flaky listing (SMB hiccup, spun-down disk) should not cost
+        # the whole scan, so retry before giving up on this directory.
+        for attempt in range(3):
+            try:
+                with os.scandir(extended_path(d)) as it:
+                    entries = sorted(it, key=lambda e: e.name)
+                break
+            except OSError as exc:
+                last_exc = exc
+                if attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+        if entries is None:
+            on_error(d, last_exc)
             continue
         files, subdirs = [], []
         for e in entries:
@@ -185,26 +200,41 @@ def run_inventory(cfg, root, logger, max_files=None):
     reparse_log = _Muffled(logger)
     root_key = norm_key(root)
 
+    def _record_unexamined(path, why):
+        nonlocal written
+        denied.append(path)
+        if norm_key(path) not in seen:
+            out.write({
+                "path": plain_path(path), "size": "", "created_utc": "",
+                "modified_utc": "", "ext": "",
+                "error": f"{why} - directory NOT scanned; its contents "
+                         f"are unknown"})
+            written += 1
+
     def on_error(path, exc):
-        nonlocal walk_errors, written
+        nonlocal walk_errors
         if norm_key(path) == root_key:
             raise SystemExit(
                 f"cannot list scan root {root}: {exc}. Is the drive "
                 f"attached and readable? Nothing was scanned.")
         if _is_permission_error(exc):
-            denied.append(path)
             err_log.warn("permission denied, recorded as unexamined: %s",
                          path)
-            if norm_key(path) not in seen:
-                out.write({
-                    "path": plain_path(path), "size": "", "created_utc": "",
-                    "modified_utc": "", "ext": "",
-                    "error": "access denied - directory NOT scanned; its "
-                             "contents are unknown"})
-                written += 1
+            _record_unexamined(path, "access denied")
             return
+        # Not a permission problem, and it survived three retries. One or a
+        # few such directories means those specific paths are bad (a NAS
+        # recycle bin that errors on enumeration, a corrupt directory entry)
+        # - record them and let the scan finish. Many of them means the
+        # device or share has actually gone away, so completion is withheld.
         walk_errors += 1
         err_log.warn("cannot list %s: %s", path, exc)
+        if walk_errors > _MAX_UNREADABLE_DIRS:
+            raise SystemExit(
+                f"{root}: {walk_errors} directories failed to list even "
+                f"after retries - the drive or share looks disconnected. "
+                f"State is resumable; re-run when it is healthy.")
+        _record_unexamined(path, f"unreadable ({exc.__class__.__name__})")
 
     def on_reparse(path, entry):
         """Record reparse points without traversing/reading them."""
@@ -259,16 +289,11 @@ def run_inventory(cfg, root, logger, max_files=None):
 
     if denied:
         logger.warning(
-            "%s: %d directory(ies) could not be read due to permissions and "
-            "are recorded as UNEXAMINED (contents unknown): %s", root,
+            "%s: %d directory(ies) could not be read and are recorded as "
+            "UNEXAMINED (contents unknown): %s", root,
             len(denied), "; ".join(denied[:10]))
     if stopped_early:
         pass
-    elif walk_errors:
-        logger.warning(
-            "inventory of %s finished with %d unreadable directories - "
-            ".done withheld so a re-run retries them (already-recorded rows "
-            "are skipped on resume)", root, walk_errors)
     else:
         with open(paths["done"], "w", encoding="utf-8") as fh:
             fh.write("complete\n")

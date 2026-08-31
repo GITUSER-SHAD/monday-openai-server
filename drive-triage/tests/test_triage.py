@@ -468,6 +468,68 @@ class RefreshTest(unittest.TestCase):
             self.assertTrue(any("keep.bin" in r["path"] for r in hashed))
 
 
+class UnreadableDirToleranceTest(unittest.TestCase):
+    """A NAS #recycle folder that errors on enumeration must not block the
+    whole share from completing - but a share that has actually gone away
+    still must."""
+
+    def _run_with_failing_scandir(self, base, root, fails, err):
+        import logging
+        from triage import inventory
+        real = os.scandir
+
+        def fake(path):
+            if any(f in str(path) for f in fails):
+                raise err
+            return real(path)
+
+        cfg = {"output_dir": os.path.join(base, "out"),
+               "follow_symlinks": False}
+        log = logging.getLogger("udt")
+        log.addHandler(logging.NullHandler())
+        real_sleep = inventory.time.sleep
+        os.scandir = fake
+        inventory.time.sleep = lambda _s: None   # skip retry backoff
+        try:
+            return inventory.run_inventory(cfg, root, log)
+        finally:
+            os.scandir = real
+            inventory.time.sleep = real_sleep
+
+    def test_one_bad_directory_still_completes(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "share")
+            os.makedirs(os.path.join(root, "#recycle"))
+            os.makedirs(os.path.join(root, "2024"))
+            with open(os.path.join(root, "2024", "photo.jpg"), "wb") as fh:
+                fh.write(b"jpeg")
+            self._run_with_failing_scandir(
+                base, root, ["#recycle"],
+                OSError(59, "An unexpected network error occurred"))
+            done = os.path.join(base, "out", "inventory",
+                                "inventory-share.done")
+            self.assertTrue(os.path.exists(done),
+                            "one bad folder must not block completion")
+            rows = rows_by_path(
+                os.path.join(base, "out", "inventory", "inventory-share.csv"),
+                INVENTORY_COLUMNS)
+            self.assertIn(os.path.join(root, "2024", "photo.jpg"), rows)
+            bad = rows.get(os.path.join(root, "#recycle"))
+            self.assertIsNotNone(bad, "bad folder must be recorded")
+            self.assertIn("NOT scanned", bad["error"])
+
+    def test_widespread_failure_still_aborts(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "share2")
+            for i in range(40):
+                os.makedirs(os.path.join(root, f"dir{i}"))
+            with self.assertRaises(SystemExit) as ctx:
+                self._run_with_failing_scandir(
+                    base, root, ["dir"],
+                    OSError(59, "An unexpected network error occurred"))
+            self.assertIn("disconnected", str(ctx.exception))
+
+
 class DRefWithoutHashesTest(unittest.TestCase):
     def test_probable_dupe_flagged_and_hash_request_written(self):
         with tempfile.TemporaryDirectory() as base:
