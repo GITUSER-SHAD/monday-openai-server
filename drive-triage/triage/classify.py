@@ -236,6 +236,27 @@ def detect_boxes(root, rows, logger):
     return box
 
 
+# Stable marker written into the evidence text so the report stage can find
+# archive-box files whose content also exists outside the box. Boxes are kept
+# intact, so these are never delete-candidates - they are review pairs.
+BOX_STRADDLE_MARKER = "[DUPE-OUTSIDE-BOX]"
+
+
+def _split_counterparts(root, box_key, box_map, counterparts):
+    """Split a file's duplicate counterparts into those outside this archive
+    box (including other drives) and those inside the same box."""
+    outside, inside = [], []
+    for cp in counterparts:
+        try:
+            cp_parts = _split_rel(root, cp)
+        except ValueError:
+            cp_parts = []
+        same_box = bool(cp_parts) and not cp_parts[0].startswith("..") and \
+            box_map.lookup(cp_parts) == box_key
+        (inside if same_box else outside).append(cp)
+    return outside, inside
+
+
 JUNK_WITHIN_BOX = re.compile(
     r"(^|[\\/])(appdata|history|filehistory|\$archive\$|temp|tmp|cache|"
     r"caches|cookies|recent|local settings)([\\/]|$)", re.IGNORECASE)
@@ -521,7 +542,7 @@ def run_classify(cfg, roots, dref, logger):
                 dupe_input[key] = {"path": row["path"], "size": h["size"],
                                    "mtime": row["modified_utc"],
                                    "full": h["full"]}
-    d_dupes, ext_dupes, keepers = resolve_dupe_groups(
+    d_dupes, ext_dupes, keepers, group_members = resolve_dupe_groups(
         list(dupe_input.values()), dref)
     del dupe_input, hashes
     probable_d = probable_d_matches(
@@ -541,7 +562,7 @@ def run_classify(cfg, roots, dref, logger):
             for row in iter_inventory(cfg, root):
                 rec = _classify_row(cfg, root, row, box_map, repo_roots,
                                     activity, d_dupes, ext_dupes, keepers,
-                                    probable_d)
+                                    probable_d, group_members)
                 out.write(rec)
                 counts[rec["class"]] = counts.get(rec["class"], 0) + 1
         stats[root] = counts
@@ -550,7 +571,7 @@ def run_classify(cfg, roots, dref, logger):
 
 
 def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
-                  ext_dupes, keepers, probable_d):
+                  ext_dupes, keepers, probable_d, group_members):
     parts = _split_rel(root, row["path"])
     name = parts[-1] if parts else os.path.basename(row["path"])
     ext = row["ext"]
@@ -597,16 +618,26 @@ def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
         proposed_dir = "Archive\\" + box_name + \
             ("\\" + rel_dir if rel_dir else "")
         full_rel = "\\".join(parts)
+        counterpart_out, counterpart_in = _split_counterparts(
+            root, box_key, box_map, group_members.get(key, []))
+        box_dupe_of = ""
         if size == 0:
             note = "; zero-byte (junk-within-box prune candidate)"
-        elif key in ext_dupes:
-            note = ("; byte-identical copy exists outside this box at "
-                    + ext_dupes[key])
+        elif counterpart_out:
+            # Boxes stay intact, so this is NOT a delete-candidate; it is
+            # flagged for manual comparison against the copy outside.
+            box_dupe_of = counterpart_out[0]
+            note = (f"; {BOX_STRADDLE_MARKER} byte-identical copy exists "
+                    f"OUTSIDE this box at {counterpart_out[0]} - review the "
+                    f"pair manually before deciding which to keep")
         elif key in d_dupes:
-            note = "; byte-identical to D: reference " + d_dupes[key]
-        elif key in keepers:
-            note = (f"; kept copy of a {keepers[key]}-copy duplicate group "
-                    f"(other copies are delete-candidates)")
+            box_dupe_of = d_dupes[key]
+            note = (f"; {BOX_STRADDLE_MARKER} byte-identical to D: reference "
+                    f"{d_dupes[key]} - review the pair manually")
+        elif counterpart_in:
+            box_dupe_of = counterpart_in[0]
+            note = (f"; duplicated only inside this box (also at "
+                    f"{counterpart_in[0]}) - box kept intact, no action")
         elif JUNK_WITHIN_BOX.search(full_rel):
             if _is_junk(parts, name, ext, size)[0]:
                 note = "; junk-within-box (prune candidate, separate approval)"
@@ -621,7 +652,7 @@ def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
         return done(
             "ARCHIVE_BOX", box_name,
             f"member of archive box {box_name!r}: {box['evidence']}{note}",
-            "high", proposed_dir, "", "hdd-mirror")
+            "high", proposed_dir, "", "hdd-mirror", box_dupe_of)
 
     # ----- zero-byte --------------------------------------------------------
     if size == 0:

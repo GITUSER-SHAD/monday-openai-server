@@ -201,10 +201,14 @@ def resolve_dupe_groups(files, dref):
     """Classify duplicate relationships.
 
     `files`: list of dicts with keys path, size(int), mtime, full(sha or None).
-    Returns (d_dupes, ext_dupes, keepers):
+    Returns (d_dupes, ext_dupes, keepers, group_members):
       d_dupes:   norm_key -> d_reference_path        (byte-certain, via SHA256)
       ext_dupes: norm_key -> keeper_path             (non-keepers only)
       keepers:   norm_key -> group_size              (elected keepers, group>1)
+      group_members: norm_key (any member) -> [other members' real paths],
+                 so a file can name its counterparts - needed to tell a
+                 duplicate that straddles an archive box from one that is
+                 duplicated only inside it.
     Probable (size+name) matches vs a hash-less D: reference are computed
     separately by probable_d_matches over the full inventory.
     """
@@ -220,7 +224,7 @@ def resolve_dupe_groups(files, dref):
             continue
         by_full[(f["size"], f["full"])].append(f)
 
-    ext_dupes, keepers = {}, {}
+    ext_dupes, keepers, group_members = {}, {}, {}
     for group in by_full.values():
         if len(group) < 2:
             continue
@@ -229,7 +233,9 @@ def resolve_dupe_groups(files, dref):
         for f in group:
             if f is not best:
                 ext_dupes[norm_key(f["path"])] = best["path"]
-    return d_dupes, ext_dupes, keepers
+            group_members[norm_key(f["path"])] = [
+                g["path"] for g in group if g is not f]
+    return d_dupes, ext_dupes, keepers, group_members
 
 
 def probable_d_matches(cfg, roots, dref, iter_rows):

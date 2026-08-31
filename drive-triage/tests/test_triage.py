@@ -244,6 +244,23 @@ class PipelineTest(unittest.TestCase):
         row = self.erow(".dropbox.device")
         self.assertEqual(row["class"], "JUNK")
 
+    def test_box_straddling_dupe_flagged_for_review_not_deleted(self):
+        box_copy = self.erow("OldLaptopBackup/Pers/00010.MTS")
+        self.assertEqual(box_copy["class"], "ARCHIVE_BOX")
+        self.assertIn("DUPE-OUTSIDE-BOX", box_copy["evidence"])
+        self.assertIn("Pers", box_copy["dupe_of"])
+        # the pair appears in the manual-review CSV
+        review = list(read_csv_rows(
+            os.path.join(self.out, "manifests",
+                         "box-straddle-review-driveE.csv"),
+            ["box_name", "box_copy", "outside_copy", "size", "evidence"]))
+        self.assertTrue(any("00010.MTS" in r["box_copy"] and
+                            "00010.MTS" in r["outside_copy"] for r in review))
+        # and the report names it
+        with open(os.path.join(self.out, "reports", "report-driveE.md"),
+                  encoding="utf-8") as fh:
+            self.assertIn("MANUAL REVIEW", fh.read())
+
     def test_media_in_temp_dir_not_junk(self):
         row = self.erow("temp/real_footage.mov")
         self.assertEqual(row["class"], "MEDIA")

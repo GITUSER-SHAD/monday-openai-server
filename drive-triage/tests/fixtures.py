@@ -26,6 +26,7 @@ RECENT = time.time() - 30 * 86400
 
 DUP_CONTENT = b"duplicate-within-e " * 5000        # ~95KB > 64KB prefix
 DUPJ_CONTENT = b"keepme-junkdir-pair " * 4000      # 80KB identical pair
+STRADDLE_CONTENT = b"same file loose and in box " * 3000  # 81KB
 XDUP_CONTENT = b"cross-drive duplicate " * 4000    # ~88KB
 DREF_CONTENT = b"identical to D reference " * 4000  # ~100KB
 BIG_A = b"A" * (80 * 1024) + b"tail-one"           # same size,
@@ -97,6 +98,10 @@ def build_drive_e(root):
            b"copynum-photo-" + bytes([48 + i]) * (10 + i), OLD)
     # loose file at drive root
     _w(root, "LooseClip.mov", b"loose-clip-at-root-bytes-000001", OLD)
+    # same content loose AND inside a backup box: must be flagged for manual
+    # review, never auto-deleted (boxes stay intact)
+    _w(root, "Pers/Private/00010.MTS", STRADDLE_CONTENT, OLD)
+    _w(root, "OldLaptopBackup/Pers/00010.MTS", STRADDLE_CONTENT, OLD)
     # macOS volume metadata: junk regardless of its private extensions
     _w(root, ".Spotlight-V100/Store-V2/ABC/0.indexHead", b"spotlight-idx", OLD)
     _w(root, ".Spotlight-V100/VolumeConfiguration.plist", b"plist-data", OLD)

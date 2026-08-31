@@ -15,7 +15,15 @@ from .util import (
     CLASSIFY_COLUMNS, MANIFEST_COLUMNS, CsvRewriter, drive_slug, fmt_gb,
     read_csv_rows, write_text,
 )
-from .classify import classify_paths
+from .classify import BOX_STRADDLE_MARKER, classify_paths
+
+REVIEW_COLUMNS = [
+    "box_name",
+    "box_copy",          # the copy inside the archive box (kept intact)
+    "outside_copy",      # byte-identical copy outside the box
+    "size",
+    "evidence",
+]
 
 ACTION_BY_CLASS = {
     "MEDIA": "copy",
@@ -75,6 +83,7 @@ def per_drive_report(cfg, root):
 
     total_files = sum(v[0] for v in by_class.values())
     total_bytes = sum(v[1] for v in by_class.values())
+    straddle_n, straddle_b = write_box_straddle_review(cfg, root)
 
     lines = [
         f"# Triage report - drive {slug} ({root})",
@@ -93,6 +102,20 @@ def per_drive_report(cfg, root):
                by_class["JUNK"][1])
     lines += ["", f"**Reclaimable (dupes + junk, pending approval): "
                   f"{fmt_gb(reclaim)}**", ""]
+    if straddle_n:
+        lines += [
+            "## Duplicated across an archive-box boundary "
+            "(FLAGGED FOR MANUAL REVIEW)",
+            "",
+            f"**{straddle_n:,} files, {fmt_gb(straddle_b)}** inside archive "
+            f"boxes are byte-identical to a file outside the box.",
+            "",
+            "These are NOT counted as reclaimable and NOT delete-candidates: "
+            "boxes stay intact by design. Each pair is listed with both "
+            "paths in `manifests/box-straddle-review-"
+            f"{slug}.csv` so you can compare them and decide later.",
+            "",
+        ]
     if boxes:
         lines += ["## Archive boxes (kept intact)", ""]
         for name, (n, b) in sorted(boxes.items(), key=lambda kv: -kv[1][1]):
@@ -117,6 +140,36 @@ def per_drive_report(cfg, root):
 # ---------------------------------------------------------------------------
 # Deliverable 2: master consolidated plan
 # ---------------------------------------------------------------------------
+
+def write_box_straddle_review(cfg, root):
+    """Write the manual-review pair list for content that exists both inside
+    an archive box and outside it. Returns (file_count, total_bytes).
+
+    Nothing here is a delete-candidate - the pairs are for the user to
+    compare and decide on later, since archive boxes are kept intact.
+    """
+    slug = drive_slug(root)
+    out = os.path.join(cfg["output_dir"], "manifests",
+                       f"box-straddle-review-{slug}.csv")
+    n, total = 0, 0
+    with CsvRewriter(out, REVIEW_COLUMNS) as w:
+        for r in iter_classified(cfg, root):
+            if r["class"] != "ARCHIVE_BOX" or \
+                    BOX_STRADDLE_MARKER not in r["evidence"]:
+                continue
+            n += 1
+            total += _size(r)
+            w.write({
+                "box_name": r["subclass"],
+                "box_copy": r["path"],
+                "outside_copy": r["dupe_of"],
+                "size": r["size"],
+                "evidence": r["evidence"],
+            })
+    if n == 0:
+        os.remove(out)  # regenerated output only
+    return n, total
+
 
 def master_plan(cfg, roots):
     by_class = defaultdict(lambda: [0, 0])
