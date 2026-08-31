@@ -365,6 +365,35 @@ class ResumeTest(unittest.TestCase):
             self.assertEqual(s1, s2)
 
 
+class UnreadableDirTest(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt" or os.geteuid() == 0,
+                     "needs POSIX chmod as non-root")
+    def test_permission_denied_dir_recorded_and_scan_completes(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "driveP")
+            os.makedirs(os.path.join(root, "locked"))
+            with open(os.path.join(root, "ok.txt"), "wb") as fh:
+                fh.write(b"readable")
+            with open(os.path.join(root, "locked", "hidden.txt"), "wb") as fh:
+                fh.write(b"unreadable")
+            os.chmod(os.path.join(root, "locked"), 0o000)
+            out = os.path.join(base, "out")
+            try:
+                run_cli("inventory", "--drive", root, "--output-dir", out,
+                        "--log-dir", os.path.join(base, "logs"))
+                # completes despite the locked dir
+                self.assertTrue(os.path.exists(os.path.join(
+                    out, "inventory", "inventory-driveP.done")))
+                rows = rows_by_path(
+                    os.path.join(out, "inventory", "inventory-driveP.csv"),
+                    INVENTORY_COLUMNS)
+                locked = rows.get(os.path.join(root, "locked"))
+                self.assertIsNotNone(locked, "locked dir must be recorded")
+                self.assertIn("access denied", locked["error"])
+            finally:
+                os.chmod(os.path.join(root, "locked"), 0o700)
+
+
 class DRefWithoutHashesTest(unittest.TestCase):
     def test_probable_dupe_flagged_and_hash_request_written(self):
         with tempfile.TemporaryDirectory() as base:

@@ -10,6 +10,7 @@ device hiccups on removable media) are recorded as rows with `error` set so
 the inventory is still complete-by-path and the failure is visible.
 """
 
+import errno
 import os
 import stat as statmod
 
@@ -69,6 +70,15 @@ def _is_reparse_point(entry):
     attrs = getattr(st, "st_file_attributes", 0)
     reparse_flag = getattr(statmod, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
     return bool(attrs & reparse_flag)
+
+
+def _is_permission_error(exc):
+    """True for ACL denials (Windows ERROR_ACCESS_DENIED / POSIX EACCES),
+    which retrying can never fix - as opposed to device/IO errors, which
+    a re-run should retry."""
+    return (isinstance(exc, PermissionError) or
+            getattr(exc, "winerror", None) == 5 or
+            getattr(exc, "errno", None) in (errno.EACCES, errno.EPERM))
 
 
 def _created_utc(st):
@@ -133,10 +143,15 @@ class _Muffled:
 def run_inventory(cfg, root, logger, max_files=None):
     """Inventory one drive. Returns (rows_written, total_rows). Read-only.
 
-    The .done marker is written ONLY after a walk with zero directory-listing
-    failures: a mid-scan USB dropout must leave the inventory resumable, not
-    stamp a partial CSV as complete. A listing failure on the scan root
-    itself aborts - nothing was scanned at all.
+    Directory-listing failures are split by cause:
+      * permission denied - an ACL that excludes even Administrator (Norton
+        scratch dirs, other machines' profiles) never becomes readable by
+        retrying, so the directory is RECORDED as unexamined and the scan
+        completes. It surfaces in the reports and decision list, never
+        silently.
+      * anything else (device not ready, USB dropout, I/O error) is
+        transient, so .done is withheld and a re-run retries it.
+    A listing failure on the scan root itself aborts - nothing was scanned.
     """
     paths = inventory_paths(cfg, root)
     if os.path.exists(paths["done"]):
@@ -151,16 +166,29 @@ def run_inventory(cfg, root, logger, max_files=None):
     written = 0
     stopped_early = False
     walk_errors = 0
+    denied = []
     err_log = _Muffled(logger)
     reparse_log = _Muffled(logger)
     root_key = norm_key(root)
 
     def on_error(path, exc):
-        nonlocal walk_errors
+        nonlocal walk_errors, written
         if norm_key(path) == root_key:
             raise SystemExit(
                 f"cannot list scan root {root}: {exc}. Is the drive "
                 f"attached and readable? Nothing was scanned.")
+        if _is_permission_error(exc):
+            denied.append(path)
+            err_log.warn("permission denied, recorded as unexamined: %s",
+                         path)
+            if norm_key(path) not in seen:
+                out.write({
+                    "path": plain_path(path), "size": "", "created_utc": "",
+                    "modified_utc": "", "ext": "",
+                    "error": "access denied - directory NOT scanned; its "
+                             "contents are unknown"})
+                written += 1
+            return
         walk_errors += 1
         err_log.warn("cannot list %s: %s", path, exc)
 
@@ -215,6 +243,11 @@ def run_inventory(cfg, root, logger, max_files=None):
             if stopped_early:
                 break
 
+    if denied:
+        logger.warning(
+            "%s: %d directory(ies) could not be read due to permissions and "
+            "are recorded as UNEXAMINED (contents unknown): %s", root,
+            len(denied), "; ".join(denied[:10]))
     if stopped_early:
         pass
     elif walk_errors:
@@ -225,7 +258,9 @@ def run_inventory(cfg, root, logger, max_files=None):
     else:
         with open(paths["done"], "w", encoding="utf-8") as fh:
             fh.write("complete\n")
-        logger.info("inventory of %s complete: %d new rows", root, written)
+        logger.info("inventory of %s complete: %d new rows (%d unexamined "
+                    "permission-denied directories)", root, written,
+                    len(denied))
     return written, written + len(seen)
 
 

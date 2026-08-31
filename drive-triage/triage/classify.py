@@ -576,8 +576,12 @@ def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
         return rec
 
     if row["error"]:
-        sub = "reparse-point" if "reparse-point" in row["error"] \
-            else "stat-error"
+        if "access denied" in row["error"]:
+            sub = "access-denied-directory"
+        elif "reparse-point" in row["error"]:
+            sub = "reparse-point"
+        else:
+            sub = "stat-error"
         return done("UNKNOWN", sub,
                     f"not readable: {row['error']}", "low")
 
