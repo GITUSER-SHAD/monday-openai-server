@@ -127,6 +127,36 @@ def _same_identity(prev, size, mtime):
             prev["modified_utc"] == mtime)
 
 
+def prune_stale_hashes(cfg, root, logger):
+    """Drop hash rows for files no longer present in the inventory.
+
+    Used after a --refresh walk: a deleted file's hash would otherwise keep
+    inflating duplicate groups and appear in cross-drive comparisons as
+    content that still exists. Only this tool's own CSVs are rewritten.
+    """
+    from .util import CsvRewriter
+    live = {norm_key(r["path"]) for r in iter_inventory(cfg, root)}
+    paths = hash_paths(cfg, root)
+    removed_total = 0
+    for key in ("prefix", "full"):
+        csv_path = paths[key]
+        if not os.path.exists(csv_path):
+            continue
+        kept = [r for r in read_csv_rows(csv_path, HASH_COLUMNS)
+                if norm_key(r["path"]) in live]
+        before = sum(1 for _ in read_csv_rows(csv_path, HASH_COLUMNS))
+        if len(kept) == before:
+            continue
+        with CsvRewriter(csv_path, HASH_COLUMNS) as w:
+            for r in kept:
+                w.write(r)
+        removed_total += before - len(kept)
+    if removed_total:
+        logger.info("refresh: dropped %d hash row(s) for files that no "
+                    "longer exist on %s", removed_total, root)
+    return removed_total
+
+
 def collect_size_census(cfg, roots, dref, logger):
     """Counter of sizes across all external inventories + D reference."""
     census = Counter()

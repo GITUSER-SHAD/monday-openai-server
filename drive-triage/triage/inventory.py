@@ -154,7 +154,21 @@ def run_inventory(cfg, root, logger, max_files=None):
     A listing failure on the scan root itself aborts - nothing was scanned.
     """
     paths = inventory_paths(cfg, root)
-    if os.path.exists(paths["done"]):
+    if cfg.get("_refresh"):
+        # Resume is append-only, so a completed inventory never notices
+        # DELETED files. A refresh starts the file list from scratch: the
+        # walk is metadata-only and fast, and every hash already computed is
+        # still reused (they match on path+size+mtime), so unchanged files
+        # are never re-read.
+        removed = 0
+        for key in ("done", "csv"):
+            if os.path.exists(paths[key]):
+                os.remove(paths[key])   # this tool's own output only
+                removed += 1
+        if removed:
+            logger.info("refresh: cleared previous file list for %s so "
+                        "deletions are picked up (hashes are kept)", root)
+    elif os.path.exists(paths["done"]):
         logger.info("inventory for %s already complete (%s)", root, paths["done"])
         return 0, sum(1 for _ in read_csv_rows(paths["csv"], INVENTORY_COLUMNS))
 

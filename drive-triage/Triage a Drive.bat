@@ -16,6 +16,15 @@ echo  share a letter never overwrite each other (example: NAS_fastwork)
 echo.
 set /p NAME="Name for this target, then Enter: "
 echo.
+echo  Have you DELETED files from this target since it was last scanned?
+echo  (Answer Y to re-check the file list so deletions drop out. Hashes
+echo   already computed are kept, so this stays fast. Answer N or just
+echo   press Enter for a normal run.)
+echo.
+set "REFRESH="
+set /p ANSWER="Deleted files since last scan? (y/N): "
+if /i "%ANSWER%"=="y" set "REFRESH=--refresh"
+echo.
 if "%TARGET:~1%"=="" vol %TARGET%:
 echo.
 echo Checking the target is reachable...
@@ -43,7 +52,7 @@ echo (This can sit with no new text for several minutes on a big target -
 echo  that is normal. Do NOT close this window. It is done only when you
 echo  see "Press any key to continue" below.)
 echo.
-python -m triage all --config triage-config.json --drive "%TARGET%" --output-dir "C:\DEV\triage\%NAME%"
+python -m triage all --config triage-config.json --drive "%TARGET%" --output-dir "C:\DEV\triage\%NAME%" %REFRESH%
 echo.
 if errorlevel 1 (
   echo ============================================

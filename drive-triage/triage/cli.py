@@ -27,7 +27,7 @@ from . import volumes as volumes_mod
 from .inventory import inventory_paths, run_inventory
 from .hashing import (
     check_hash_marker, collect_prefix_groups, collect_size_census,
-    run_full_stage, run_prefix_stage, write_hash_marker,
+    prune_stale_hashes, run_full_stage, run_prefix_stage, write_hash_marker,
 )
 from .dupes import DReference
 from .classify import run_classify
@@ -195,6 +195,9 @@ def cmd_inventory(cfg, args, logger):
 
 def cmd_hash(cfg, args, logger):
     roots = _resolve_roots(cfg, args, logger)
+    if args.refresh:
+        for root in roots:
+            prune_stale_hashes(cfg, root, logger)
     dref = _dref(cfg, logger)
     census = collect_size_census(cfg, roots, dref, logger)
     for root in roots:
@@ -297,6 +300,10 @@ def main(argv=None):
                     help="override d_reference_csv")
     ap.add_argument("--max-files", type=int, default=None,
                     help="stop each stage after N new rows (testing/resume)")
+    ap.add_argument("--refresh", action="store_true",
+                    help="re-walk the target's file list from scratch so "
+                         "DELETED files drop out; hashes already computed "
+                         "are reused, so unchanged files are not re-read")
     ap.add_argument("--workspace", default="",
                     help="crossdrive: folder containing all run folders "
                          "(default: parent of output_dir)")
@@ -311,6 +318,7 @@ def main(argv=None):
         cfg["d_reference_csv"] = args.d_reference
     if args.drive:
         cfg["scan_roots"] = list(args.drive)
+    cfg["_refresh"] = bool(args.refresh)
 
     # Guard BEFORE creating any directory or log file. For scanning commands
     # the roots are fully resolved (scope.json included) right here, so a

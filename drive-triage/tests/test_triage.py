@@ -428,6 +428,46 @@ class CircuitBreakerTest(unittest.TestCase):
                 b.failure(OSError(5, "I/O error"))
 
 
+class RefreshTest(unittest.TestCase):
+    """A completed inventory is append-only, so deletions are invisible
+    until --refresh re-walks the file list."""
+
+    def test_refresh_drops_deleted_files_and_their_hashes(self):
+        with tempfile.TemporaryDirectory() as base:
+            root = os.path.join(base, "driveR")
+            out = os.path.join(base, "out")
+            logs = os.path.join(base, "logs")
+            os.makedirs(root)
+            # two identical files so both get hashed, plus a third
+            payload = b"identical payload " * 5000
+            for rel in ("keep.bin", "gone.bin"):
+                with open(os.path.join(root, rel), "wb") as fh:
+                    fh.write(payload)
+            common = ["--drive", root, "--output-dir", out, "--log-dir", logs]
+            for cmd in ("inventory", "hash"):
+                run_cli(cmd, *common)
+            inv = os.path.join(out, "inventory", "inventory-driveR.csv")
+            self.assertEqual(len(rows_by_path(inv, INVENTORY_COLUMNS)), 2)
+
+            os.remove(os.path.join(root, "gone.bin"))
+
+            # without --refresh the deletion is not noticed
+            run_cli("inventory", *common)
+            self.assertEqual(len(rows_by_path(inv, INVENTORY_COLUMNS)), 2)
+
+            # with --refresh it is, and the stale hash row goes too
+            run_cli("inventory", "--refresh", *common)
+            after = rows_by_path(inv, INVENTORY_COLUMNS)
+            self.assertEqual(len(after), 1)
+            self.assertIn(os.path.join(root, "keep.bin"), after)
+            run_cli("hash", "--refresh", *common)
+            hashed = list(read_csv_rows(
+                os.path.join(out, "hashes", "prefix-driveR.csv"),
+                HASH_COLUMNS))
+            self.assertTrue(all("gone.bin" not in r["path"] for r in hashed))
+            self.assertTrue(any("keep.bin" in r["path"] for r in hashed))
+
+
 class DRefWithoutHashesTest(unittest.TestCase):
     def test_probable_dupe_flagged_and_hash_request_written(self):
         with tempfile.TemporaryDirectory() as base:
@@ -764,8 +804,10 @@ class SecurityTest(unittest.TestCase):
     def test_no_delete_or_rename_of_scanned_paths(self):
         # os.remove/os.replace are permitted only on regenerated outputs.
         # each: removing one of the tool's OWN regenerated output files
+        # (inventory.py: 1 loop clearing its own csv + done marker on
+        # --refresh, never a scanned path)
         allowed = {"classify.py": 1, "report.py": 1, "util.py": 1,
-                   "crossdrive.py": 1}
+                   "crossdrive.py": 1, "inventory.py": 1}
         for fn, src in self._sources():
             removes = src.count("os.remove(") + src.count("os.rename(") \
                 + src.count("os.unlink(")
