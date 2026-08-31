@@ -704,6 +704,41 @@ class UnitTest(unittest.TestCase):
             {"letter": "E:", "drive_type": "Fixed", "bus": "USB"}))
 
 
+class DupeGroupScaleTest(unittest.TestCase):
+    """Layered backups routinely produce groups with tens of thousands of
+    identical copies. Building a per-member counterpart list for those is
+    quadratic and once pegged a real scan at 100% CPU for over an hour."""
+
+    def test_huge_group_is_linear_not_quadratic(self):
+        import time
+        from triage.dupes import DReference, resolve_dupe_groups
+
+        def build(n):
+            files = [{"path": f"/d/f{i}.dat", "size": 8, "mtime": "t",
+                      "full": "a" * 64} for i in range(n)]
+            start = time.perf_counter()
+            resolve_dupe_groups(files, DReference.empty())
+            return time.perf_counter() - start
+
+        build(2000)                       # warm up
+        small, large = build(4000), build(16000)
+        # 4x the members must not cost anywhere near 16x the time
+        self.assertLess(large, max(small * 8, 0.5),
+                        f"resolve_dupe_groups looks quadratic: "
+                        f"4000 took {small:.3f}s, 16000 took {large:.3f}s")
+
+    def test_counterparts_exclude_self_and_are_capped(self):
+        from triage.dupes import DReference, resolve_dupe_groups
+        from triage.util import norm_key
+        files = [{"path": f"/d/c{i}.dat", "size": 8, "mtime": "t",
+                  "full": "b" * 64} for i in range(80)]
+        _, _, _, groups = resolve_dupe_groups(files, DReference.empty())
+        cps = groups.counterparts(norm_key("/d/c0.dat"))
+        self.assertNotIn("/d/c0.dat", cps)
+        self.assertEqual(len(cps), 25)
+        self.assertEqual(groups.counterparts(norm_key("/d/absent.dat")), [])
+
+
 class CrossDriveTest(unittest.TestCase):
     """Several physical drives were all mounted as F:, so the comparison
     must key on content hash and attribute copies by run-folder name."""

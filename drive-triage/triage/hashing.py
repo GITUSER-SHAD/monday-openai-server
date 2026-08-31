@@ -294,7 +294,10 @@ def run_full_stage(cfg, root, prefix_groups, dref, logger, max_files=None):
                 breaker.failure(exc)
             out.write(rec)
             written += 1
-            if written % 1000 == 0:
+            # full hashes read whole files, so a small candidate set can
+            # still take a long time - report often enough that a working
+            # run is never mistaken for a hung one
+            if written <= 10 or written % 25 == 0:
                 logger.info("%s: full-hashed %d files", root, written)
             if max_files is not None and written >= max_files:
                 logger.info("full stage stopping at max_files (resumable)")

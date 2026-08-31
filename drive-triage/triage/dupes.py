@@ -205,10 +205,13 @@ def resolve_dupe_groups(files, dref):
       d_dupes:   norm_key -> d_reference_path        (byte-certain, via SHA256)
       ext_dupes: norm_key -> keeper_path             (non-keepers only)
       keepers:   norm_key -> group_size              (elected keepers, group>1)
-      group_members: norm_key (any member) -> [other members' real paths],
-                 so a file can name its counterparts - needed to tell a
-                 duplicate that straddles an archive box from one that is
-                 duplicated only inside it.
+      group_members: a GroupIndex; .counterparts(norm_key) names the other
+                 copies of that file's content - needed to tell a duplicate
+                 that straddles an archive box from one duplicated only
+                 inside it. Stored per GROUP, not per member: materialising
+                 a list for every member is quadratic, and a group with tens
+                 of thousands of identical copies (routine in layered
+                 backups) then costs minutes of CPU and gigabytes of RAM.
     Probable (size+name) matches vs a hash-less D: reference are computed
     separately by probable_d_matches over the full inventory.
     """
@@ -224,18 +227,47 @@ def resolve_dupe_groups(files, dref):
             continue
         by_full[(f["size"], f["full"])].append(f)
 
-    ext_dupes, keepers, group_members = {}, {}, {}
+    ext_dupes, keepers = {}, {}
+    group_of, group_paths = {}, []
     for group in by_full.values():
         if len(group) < 2:
             continue
         best = max(group, key=lambda f: _keeper_score(f["path"], f["mtime"]))
         keepers[norm_key(best["path"])] = len(group)
+        gid = len(group_paths)
+        group_paths.append([f["path"] for f in group])  # each path once
         for f in group:
             if f is not best:
                 ext_dupes[norm_key(f["path"])] = best["path"]
-            group_members[norm_key(f["path"])] = [
-                g["path"] for g in group if g is not f]
-    return d_dupes, ext_dupes, keepers, group_members
+            group_of[norm_key(f["path"])] = gid
+    return d_dupes, ext_dupes, keepers, GroupIndex(group_of, group_paths)
+
+
+class GroupIndex:
+    """Duplicate groups stored once, with counterparts resolved on demand.
+
+    Memory and build time are linear in the number of duplicated files, so a
+    group with many thousands of identical copies stays cheap.
+    """
+
+    def __init__(self, group_of, group_paths):
+        self._group_of = group_of
+        self._group_paths = group_paths
+
+    def counterparts(self, key, limit=25):
+        """Other copies of this file's content. Capped: naming a handful is
+        enough for a review pair, and an unbounded list would reintroduce
+        the quadratic blow-up on huge groups."""
+        gid = self._group_of.get(key)
+        if gid is None:
+            return []
+        out = []
+        for path in self._group_paths[gid]:
+            if norm_key(path) != key:
+                out.append(path)
+                if len(out) >= limit:
+                    break
+        return out
 
 
 def probable_d_matches(cfg, roots, dref, iter_rows):

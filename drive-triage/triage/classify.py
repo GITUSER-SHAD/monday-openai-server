@@ -530,8 +530,14 @@ def run_classify(cfg, roots, dref, logger):
     All inventory reads stream from the CSVs; memory holds only the hash
     candidates and dupe maps, never full inventories.
     """
+    # Classification makes several passes over the inventories; on a
+    # multi-hundred-thousand-file target each takes a while, so announce
+    # each stage - silence here previously looked like a hang.
+    logger.info("classify: filtering D reference against scan roots")
     dref.drop_paths_under(roots, logger)
+    logger.info("classify: loading hashes")
     hashes = load_all_hashes(cfg, roots)
+    logger.info("classify: building duplicate groups")
 
     dupe_input = {}
     for root in roots:
@@ -554,17 +560,26 @@ def run_classify(cfg, roots, dref, logger):
 
     stats = {}
     for root in roots:
+        logger.info("classify: %s - detecting archive boxes", root)
         box_map = detect_boxes(root, iter_inventory(cfg, root), logger)
+        logger.info("classify: %s - detecting git repositories", root)
         repo_roots = detect_repos(root, iter_inventory(cfg, root))
+        logger.info("classify: %s - measuring project activity", root)
         activity = collect_project_activity(cfg, root)
+        logger.info("classify: %s - classifying files", root)
         counts = {}
         with CsvRewriter(classify_paths(cfg, root), CLASSIFY_COLUMNS) as out:
+            done_n = 0
             for row in iter_inventory(cfg, root):
                 rec = _classify_row(cfg, root, row, box_map, repo_roots,
                                     activity, d_dupes, ext_dupes, keepers,
                                     probable_d, group_members)
                 out.write(rec)
                 counts[rec["class"]] = counts.get(rec["class"], 0) + 1
+                done_n += 1
+                if done_n % 25000 == 0:
+                    logger.info("classify: %s - %d files classified",
+                                root, done_n)
         stats[root] = counts
         logger.info("%s classified: %s", root, counts)
     return stats
@@ -619,7 +634,7 @@ def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
             ("\\" + rel_dir if rel_dir else "")
         full_rel = "\\".join(parts)
         counterpart_out, counterpart_in = _split_counterparts(
-            root, box_key, box_map, group_members.get(key, []))
+            root, box_key, box_map, group_members.counterparts(key))
         box_dupe_of = ""
         if size == 0:
             note = "; zero-byte (junk-within-box prune candidate)"
