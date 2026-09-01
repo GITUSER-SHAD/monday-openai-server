@@ -913,5 +913,387 @@ class SecurityTest(unittest.TestCase):
                 f"{fn} contains unexpected delete/rename calls")
 
 
+
+class HashGapsTest(unittest.TestCase):
+    """`hashgaps` closes the cross-drive coverage gap by hashing ONLY the
+    files no per-drive run ever hashed - and refuses to touch a drive it
+    cannot prove is the one that was scanned. Several drives in the real
+    fleet were all mounted as F:, so hashing another disk's bytes under this
+    drive's paths would corrupt the duplicate set and could justify a wrong
+    delete. That refusal is the important assertion here."""
+
+    def _write(self, path, data):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return path
+
+    def _mkrun(self, ws, name, slug, anchors, gaps):
+        """anchors: real files recorded WITH hashes (prove volume identity).
+        gaps: real files recorded in the inventory but never hashed."""
+        import hashlib
+        from triage.util import CsvAppender, iso_utc, PREFIX_BYTES
+        inv = os.path.join(ws, name, "inventory", f"inventory-{slug}.csv")
+        with CsvAppender(inv, INVENTORY_COLUMNS) as w:
+            for p in anchors + gaps:
+                st = os.stat(p)
+                w.write({"path": p, "size": st.st_size, "ext": "bin",
+                         "error": "", "created_utc": iso_utc(st.st_mtime),
+                         "modified_utc": iso_utc(st.st_mtime)})
+        with open(os.path.join(ws, name, "inventory",
+                               f"inventory-{slug}.done"), "w") as fh:
+            fh.write("complete\n")
+        with CsvAppender(os.path.join(ws, name, "hashes",
+                                      f"prefix-{slug}.csv"),
+                         HASH_COLUMNS) as w:
+            for p in anchors:
+                st = os.stat(p)
+                with open(p, "rb") as fh:
+                    blob = fh.read()
+                pre = hashlib.sha256(blob[:PREFIX_BYTES]).hexdigest()
+                w.write({"path": p, "size": st.st_size,
+                         "modified_utc": iso_utc(st.st_mtime),
+                         "prefix_sha256": pre,
+                         "full_sha256": hashlib.sha256(blob).hexdigest(),
+                         "error": ""})
+
+    def _fixture(self, root):
+        """Two 'drives' whose only shared content is a pair of files that
+        were size-unique on each drive, so neither run ever hashed them."""
+        ws = os.path.join(root, "ws")
+        d1, d2 = os.path.join(root, "vol1"), os.path.join(root, "vol2")
+        # anchors: distinct sizes per drive, so they are not gaps themselves.
+        # At least _VERIFY_MIN_MATCHES of them must be re-readable and
+        # identical before any drive is touched.
+        anchors1 = [self._write(os.path.join(d1, f"a{i}.bin"),
+                                bytes([65 + i]) * (100 + i))
+                    for i in range(8)]
+        anchors2 = [self._write(os.path.join(d2, f"b{i}.bin"),
+                                bytes([97 + i]) * (900 + i))
+                    for i in range(8)]
+        # the gap pair: byte-identical, same size, one copy on each drive
+        # > PREFIX_BYTES, so closing the gap genuinely requires
+        # the second (full-hash) stage, not just the prefix pass
+        twin = b"TWIN-CONTENT" * 10000
+        g1 = self._write(os.path.join(d1, "deep", "twin.bin"), twin)
+        g2 = self._write(os.path.join(d2, "other", "copy.bin"), twin)
+        self._mkrun(ws, "DriveOne", "A", anchors1, [g1])
+        self._mkrun(ws, "DriveTwo", "B", anchors2, [g2])
+        return ws, d1, d2, g1, g2
+
+    def _log(self):
+        import logging
+        log = logging.getLogger("hgtest")
+        log.addHandler(logging.NullHandler())
+        log.propagate = False
+        return log
+
+    def test_closes_the_gap_end_to_end(self):
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, _, _, g1, g2 = self._fixture(root)
+            first = crossdrive.analyze(ws, log)
+            self.assertEqual(first["groups"], 0)      # nothing comparable yet
+            self.assertEqual(first["gap_files"], 2)   # both twins uncompared
+
+            res = hashgaps.run(ws, log)
+            self.assertEqual(res["skipped"], [])
+            self.assertEqual(res["full_hashed"], 2)
+
+            second = crossdrive.analyze(ws, log)
+            self.assertEqual(second["groups"], 1)
+            self.assertEqual(second["gap_files"], 0)
+            with open(second["groups_csv"], encoding="utf-8") as fh:
+                paths = fh.read()
+            self.assertIn(os.path.basename(g1), paths)
+            self.assertIn(os.path.basename(g2), paths)
+
+    def test_refuses_a_drive_whose_content_changed_under_it(self):
+        """The wrong-volume case: same paths, different bytes. Nothing may
+        be hashed for that drive - a false duplicate here is unrecoverable."""
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, d1, _, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            # another disk is now mounted where DriveOne was: identical
+            # sizes, different content
+            for i in range(4):   # half the sample now holds other bytes
+                p = os.path.join(d1, f"a{i}.bin")
+                self._write(p, bytes(os.stat(p).st_size))
+
+            res = hashgaps.run(ws, log)
+            skipped = dict(res["skipped"])
+            self.assertIn("DriveOne", skipped)
+            self.assertIn("DIFFERENT CONTENT", skipped["DriveOne"])
+            self.assertNotIn("DriveOne", [n for n, _, _ in res["processed"]])
+            # and nothing was recorded for it
+            self.assertFalse(os.path.exists(
+                os.path.join(ws, "DriveOne", "hashes", "full-A.csv")))
+
+    def test_skips_a_drive_that_is_not_attached(self):
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, d1, _, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            shutil.rmtree(d1)
+            res = hashgaps.run(ws, log)
+            skipped = dict(res["skipped"])
+            self.assertIn("DriveOne", skipped)
+            self.assertIn("not attached", skipped["DriveOne"])
+            # the attached drive is still processed
+            self.assertIn("DriveTwo", [n for n, _, _ in res["processed"]])
+
+    def test_scanned_files_are_not_modified(self):
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, d1, d2, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+
+            def snapshot():
+                out = {}
+                for base in (d1, d2):
+                    for dirpath, _, names in os.walk(base):
+                        for n in names:
+                            fp = os.path.join(dirpath, n)
+                            st = os.stat(fp)
+                            with open(fp, "rb") as fh:
+                                out[fp] = (st.st_size, int(st.st_mtime),
+                                           fh.read())
+                return out
+
+            before = snapshot()
+            hashgaps.run(ws, log)
+            self.assertEqual(before, snapshot())
+
+    # -- the wrong-volume defence, attacked --------------------------------
+
+    def test_refuses_a_sibling_drive_that_shares_only_a_few_files(self):
+        """The realistic wrong-volume case: six externals all mount as F:,
+        and one is a partial backup of another, so it carries SOME of the
+        same files. Matching on the files it happens to share must not
+        authorise hashing everything else on it as this drive's content."""
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, d1, _, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            # a different disk is at F:. It carries 3 of DriveOne's 8 anchor
+            # files byte-for-byte (it is a partial backup) and nothing else.
+            for i in range(3, 8):
+                os.remove(os.path.join(d1, f"a{i}.bin"))
+            os.remove(os.path.join(d1, "deep", "twin.bin"))
+            res = hashgaps.run(ws, log)
+            skipped = dict(res["skipped"])
+            self.assertIn("DriveOne", skipped)
+            self.assertIn("only 3 of 8", skipped["DriveOne"])
+            self.assertNotIn("DriveOne", [n for n, _, _ in res["processed"]])
+
+    def test_refuses_a_run_with_too_few_hashes_to_verify(self):
+        """No content evidence means no hashing. Size+mtime is not evidence:
+        a clone or a timestamp-preserving copy reproduces both exactly."""
+        from triage import hashgaps
+        from triage.util import CsvAppender, iso_utc
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "vol")
+            f = self._write(os.path.join(d, "only.bin"), b"x" * 4096)
+            rd = os.path.join(root, "ws", "Solo")
+            st = os.stat(f)
+            with CsvAppender(os.path.join(rd, "inventory",
+                                          "inventory-Z.csv"),
+                             INVENTORY_COLUMNS) as w:
+                w.write({"path": f, "size": st.st_size, "ext": "bin",
+                         "error": "", "created_utc": iso_utc(st.st_mtime),
+                         "modified_utc": iso_utc(st.st_mtime)})
+            ok, why = hashgaps.verify_volume(rd, "Z", self._log())
+            self.assertFalse(ok)
+            self.assertIn("too few", why)
+
+    def test_multi_target_run_folder_verifies_each_volume_separately(self):
+        """A run folder holding two targets names two DIFFERENT physical
+        volumes. Proving one is mounted says nothing about the other."""
+        from triage import hashgaps
+        with tempfile.TemporaryDirectory() as root:
+            ws = os.path.join(root, "ws")
+            dE, dF = os.path.join(root, "volE"), os.path.join(root, "volF")
+            ae = [self._write(os.path.join(dE, f"e{i}.bin"),
+                              bytes([70 + i]) * (500 + i)) for i in range(4)]
+            af = [self._write(os.path.join(dF, f"f{i}.bin"),
+                              bytes([80 + i]) * (700 + i)) for i in range(4)]
+            ge = self._write(os.path.join(dE, "ge.bin"), b"E" * 70000)
+            gf = self._write(os.path.join(dF, "gf.bin"), b"F" * 70000)
+            self._mkrun(ws, "BOTH", "E", ae, [ge])
+            self._mkrun(ws, "BOTH", "F", af, [gf])
+            self.assertEqual(hashgaps.run_slugs(os.path.join(ws, "BOTH")),
+                             ["E", "F"])
+            # swap the F: volume for something else entirely
+            for p in af:
+                self._write(p, bytes(os.stat(p).st_size))
+            rd = os.path.join(ws, "BOTH")
+            self.assertTrue(hashgaps.verify_volume(rd, "E", self._log())[0])
+            okF, whyF = hashgaps.verify_volume(rd, "F", self._log())
+            self.assertFalse(okF)
+            self.assertIn("DIFFERENT CONTENT", whyF)
+            # and each volume's gap paths are routed to its own slug
+            split = hashgaps.split_by_slug(rd, ["E", "F"], [ge, gf],
+                                           self._log())
+            self.assertEqual(split["E"], [ge])
+            self.assertEqual(split["F"], [gf])
+
+    def test_reports_a_gap_drive_whose_run_folder_is_missing(self):
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, _, _, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            os.rename(os.path.join(ws, "DriveOne"),
+                      os.path.join(ws, "DriveOne-moved"))
+            res = hashgaps.run(ws, log)
+            skipped = dict(res["skipped"])
+            self.assertIn("DriveOne", skipped)
+            self.assertIn("no run folder", skipped["DriveOne"])
+
+    def test_deleted_gap_files_do_not_look_like_a_dead_drive(self):
+        """The gap list is a snapshot; files deleted since then are normal.
+        Treating them as device failures would abort the drive."""
+        from triage import hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "vol")
+            live = self._write(os.path.join(d, "live.bin"), b"L" * 70000)
+            gone = [os.path.join(d, f"gone{i}.bin") for i in range(60)]
+            rd = os.path.join(root, "ws", "D")
+            breaker = hashgaps._GapBreaker("D", "prefix hashing")
+            n = hashgaps._prefix_gaps(rd, "A", gone + [live], log, breaker)
+            self.assertEqual(n, 1)          # the surviving file was hashed
+            self.assertEqual(breaker.vanished, 60)
+            self.assertEqual(breaker.errors, 0)
+
+    def test_full_pass_skips_a_file_that_changed_since_the_prefix_pass(self):
+        from triage import hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "vol")
+            f = self._write(os.path.join(d, "moving.bin"), b"A" * 70000)
+            rd = os.path.join(root, "ws", "D")
+            breaker = hashgaps._GapBreaker("D", "prefix hashing")
+            hashgaps._prefix_gaps(rd, "A", [f], log, breaker)
+            rows = list(hashgaps._load_hashed(
+                hashgaps.hash_csvs(rd, "A")[0]).values())
+            self._write(f, b"B" * 90000)     # different size and content
+            n = hashgaps._full_gaps(rd, "A", rows, log,
+                                    hashgaps._GapBreaker("D", "full hashing"))
+            self.assertEqual(n, 0)
+
+    def test_gap_count_converges_for_files_proven_unique(self):
+        """Same size, different content: after one gap pass the 64KB
+        prefixes prove no twin can exist, so the files must drop off the
+        gap list instead of being reported forever."""
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws = os.path.join(root, "ws")
+            d1, d2 = os.path.join(root, "v1"), os.path.join(root, "v2")
+            a1 = [self._write(os.path.join(d1, f"a{i}.bin"),
+                              bytes([65 + i]) * (100 + i)) for i in range(8)]
+            a2 = [self._write(os.path.join(d2, f"b{i}.bin"),
+                              bytes([97 + i]) * (900 + i)) for i in range(8)]
+            # equal size, different bytes -> look like gap candidates, but
+            # are not duplicates and never will be
+            n1 = self._write(os.path.join(d1, "n1.bin"), b"X" * 160000)
+            n2 = self._write(os.path.join(d2, "n2.bin"), b"Y" * 160000)
+            self._mkrun(ws, "One", "A", a1, [n1])
+            self._mkrun(ws, "Two", "B", a2, [n2])
+
+            self.assertEqual(crossdrive.analyze(ws, log)["gap_files"], 2)
+            res = hashgaps.run(ws, log)
+            self.assertEqual(res["full_hashed"], 0)   # nothing worth reading
+            self.assertEqual(res["pending"], [])
+            after = crossdrive.analyze(ws, log)
+            self.assertEqual(after["gap_files"], 0)
+            self.assertEqual(after["groups"], 0)
+
+    def test_converges_for_drives_that_cannot_be_attached_together(self):
+        """Six externals all mount as F:, so two of them are never present
+        at once. The twin pair must still be found, and the summary must say
+        which drive still owes a whole-file hash rather than going quiet."""
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, d1, d2, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            # pass 1: only DriveOne is plugged in
+            r1 = hashgaps.run(ws, log, only=["DriveOne"])
+            self.assertEqual(r1["full_hashed"], 0)
+            # pass 2: swap to DriveTwo - now the prefixes match across drives
+            r2 = hashgaps.run(ws, log, only=["DriveTwo"])
+            self.assertEqual(r2["full_hashed"], 1)
+            self.assertEqual([lbl for lbl, _ in r2["pending"]], ["DriveOne"])
+            # pass 3: DriveOne back on, and it is told exactly that
+            r3 = hashgaps.run(ws, log, only=["DriveOne"])
+            self.assertEqual(r3["full_hashed"], 1)
+            self.assertEqual(r3["pending"], [])
+            final = crossdrive.analyze(ws, log)
+            self.assertEqual(final["groups"], 1)
+            self.assertEqual(final["gap_files"], 0)
+
+    def test_failed_full_hash_is_not_reported_as_a_unique_prefix(self):
+        """A whole-file read that failed must be named as a read failure -
+        calling it 'prefix matched nothing' hides a failing disk."""
+        from triage import crossdrive
+        from triage.util import CsvAppender
+        with tempfile.TemporaryDirectory() as root:
+            rd = os.path.join(root, "run")
+            with CsvAppender(os.path.join(rd, "hashes", "prefix-A.csv"),
+                             HASH_COLUMNS) as w:
+                w.write({"path": r"F:\v.mov", "size": "5000",
+                         "modified_utc": "2020-01-01T00:00:00Z",
+                         "prefix_sha256": "ab" * 32, "full_sha256": "",
+                         "error": ""})
+            with CsvAppender(os.path.join(rd, "hashes", "full-A.csv"),
+                             HASH_COLUMNS) as w:
+                w.write({"path": r"F:\v.mov", "size": "5000",
+                         "modified_utc": "2020-01-01T00:00:00Z",
+                         "prefix_sha256": "ab" * 32, "full_sha256": "",
+                         "error": "[Errno 5] I/O error"})
+            state = crossdrive.prefix_status(rd)
+            _size, _pre, failure = state[list(state)[0]]
+            self.assertIn("whole-file read failed", failure)
+
+    def test_only_flag_limits_to_named_runs(self):
+        from triage import crossdrive, hashgaps
+        log = self._log()
+        with tempfile.TemporaryDirectory() as root:
+            ws, _, _, _, _ = self._fixture(root)
+            crossdrive.analyze(ws, log)
+            res = hashgaps.run(ws, log, only=["DriveTwo"])
+            self.assertEqual([n for n, _, _ in res["processed"]], ["DriveTwo"])
+            # with only one drive prefix-hashed, its twin has no counterpart
+            # yet in the global census, so nothing is full-hashed
+            self.assertEqual(res["full_hashed"], 0)
+
+    def test_requires_the_gap_list_to_exist(self):
+        from triage import hashgaps
+        with tempfile.TemporaryDirectory() as root:
+            ws, _, _, _, _ = self._fixture(root)
+            with self.assertRaises(SystemExit) as ctx:
+                hashgaps.run(ws, self._log())
+            self.assertIn("Compare All Drives", str(ctx.exception))
+
+    def test_workspace_may_not_be_a_whole_drive_or_share(self):
+        """crossdrive and hashgaps both WRITE into the workspace, so a bare
+        volume/share root - what a scanned drive looks like - is refused."""
+        import argparse
+        for bad in ("E:\\", "E:", "\\\\nas\\photos"):
+            args = argparse.Namespace(workspace=bad)
+            cfg = {"output_dir": os.path.join("C:", "DEV", "triage", "X")}
+            with self.assertRaises(SystemExit) as ctx:
+                cli._resolve_workspace(cfg, args)
+            self.assertRegex(str(ctx.exception), "refusing|not found")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

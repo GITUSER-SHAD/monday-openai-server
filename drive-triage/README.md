@@ -56,9 +56,11 @@ python -m triage inventory --config triage-config.json --drive E:\
   completed work; a torn final CSV line from a crash is tolerated.
 - Classification and reports are pure, fast recomputation over the Phase 1
   CSVs — re-running them touches no drive data.
-- Per-drive state is independent: a missing drive is skipped at inventory
-  with a warning (re-run when it's attached). `hash`/`classify` require the
-  in-scope inventories to be complete first and say so if not.
+- Per-drive state is independent **at inventory**: a missing drive is
+  skipped with a warning. Later stages are not — `hash` and `classify`
+  require every in-scope inventory to be complete, so one detached drive
+  stops the whole run. Scan one target at a time (which is what
+  `Triage a Drive.bat` does) and this never bites.
 
 ## Duplicate detection
 
@@ -95,6 +97,44 @@ NAS tiers: recently-modified client projects → `fastwork`
 (`<Project>\01_RAW|02_SELECTS|03_EDIT|04_DELIVERABLES`); legacy media,
 personal shoots, records, archive boxes → `hdd-mirror`; dupes/junk → `none`.
 
+## Cross-drive comparison and closing its gap
+
+Each drive is triaged into its OWN folder (`C:\DEV\triage\<NAME>\`), because
+several physical drives can share a letter — five of this fleet's were all
+`F:`. Two commands then work across those folders:
+
+```bat
+python -m triage crossdrive --workspace C:\DEV\triage    rem Compare All Drives.bat
+python -m triage hashgaps   --workspace C:\DEV\triage    rem Close the Gap.bat
+```
+
+`crossdrive` compares the SHA256s the per-drive runs already recorded — it
+reads no drive, so nothing needs to be plugged in. Matches are byte-certain;
+what it reports is **presence, never absence**. Because each run built its
+own size census, a file whose size was unique on its own drive was never
+hashed and cannot appear in any comparison. Those files are listed, with the
+reason each one has no hash, in `_cross-drive/manifests/cross-drive-gaps.csv`.
+
+`hashgaps` closes exactly that gap: it hashes only the files on that list,
+appends the results into the same per-run CSVs, and stops. Attach whichever
+drives you can; the rest are named in the summary, and re-running with them
+attached continues where it left off. Expect more than one turn per drive —
+a file is only worth reading whole once something else in the fleet shares
+its 64KB prefix, so a twin pair split across two drives that both mount as
+`F:` needs each drive attached twice. The summary always names what still
+owes a whole-file hash.
+
+**A drive that no longer holds what it held when it was scanned is refused,
+not guessed at.** Before touching one, a spread sample of files that run
+already hashed is re-read and the hashes must match; samples that are merely
+*absent* are disqualifying too, so a sibling drive that shares a few paths
+cannot pass on those. The check is repeated before the whole-file pass,
+which can start hours later, and every file is re-stat'd so a changed file
+is left for the next run rather than recorded against stale metadata. All of
+this exists because recording one drive's bytes under another drive's paths
+would fabricate a duplicate — the one error that could later justify
+deleting the only copy of something.
+
 ## Outputs (all under `output_dir`, default `C:\DEV\triage\`)
 
 ```
@@ -111,6 +151,11 @@ reports\decision-list.md      your judgment calls, grouped for bulk answers
 d-hash-request.csv            only if the D: reference lacks hashes
 ```
 
+The two `.bat` launchers pass `--output-dir C:\DEV\triage\<NAME>`, so in
+normal use the tree above exists once **per target** and `C:\DEV\triage\`
+itself is the workspace holding them, plus `_cross-drive\` for the
+comparison outputs.
+
 Nothing in `manifests\` is executed by this tool — they are input for a
 later, separately approved session.
 
@@ -120,10 +165,12 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-48 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+81 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
-(including torn-CSV repair), read-only behavior, and the security
-properties (no network imports, no delete/rename calls, guard bypasses).
+(including torn-CSV repair), read-only behavior, cross-drive comparison and
+gap closing (including the refusal to hash a drive whose content changed),
+and the security properties (no network imports, no delete/rename calls,
+guard bypasses).
 
 The Windows-only safety paths (reparse-point skipping, `\\?\` handling,
 volume-identity binding, the system-drive output rule) cannot execute on the

@@ -7,6 +7,8 @@
   python -m triage classify
   python -m triage report
   python -m triage all        (inventory -> hash -> classify -> report)
+  python -m triage crossdrive [--workspace C:\\DEV\\triage]
+  python -m triage hashgaps   [--workspace C:\\DEV\\triage] [--run NAME]
 
 Every command is read-only with respect to scanned drives and resumable:
 interrupt at any point and re-run the same command. Verbose progress goes to
@@ -15,6 +17,7 @@ log files under log_dir; the console only prints warnings and a short summary.
 
 import argparse
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -33,6 +36,7 @@ from .dupes import DReference
 from .classify import run_classify
 from .report import run_reports
 from . import crossdrive
+from . import hashgaps
 
 
 def _resolve_roots(cfg, args, logger):
@@ -244,12 +248,50 @@ def cmd_report(cfg, args, logger):
     return 0
 
 
-def cmd_crossdrive(cfg, args, logger):
-    """Compare every completed run in the workspace against each other."""
-    workspace = args.workspace or os.path.dirname(
-        cfg["output_dir"].rstrip("\\/")) or cfg["output_dir"]
+def _approved_scope(cfg):
+    """Scan roots the user has approved, best effort - used to make sure a
+    write target is not on one of them."""
+    scope_path = os.path.join(cfg["output_dir"], "scope.json")
+    if not os.path.exists(scope_path):
+        return []
+    try:
+        return volumes_mod.load_approved_scope(scope_path)
+    except SystemExit:
+        raise
+    except Exception:
+        return []
+
+
+def _resolve_workspace(cfg, args):
+    """The folder holding every per-target run folder.
+
+    Fully guarded, because both commands that take it WRITE inside it -
+    crossdrive creates _cross-drive/, hashgaps appends to each run folder's
+    hash CSVs. A lexical check alone is not enough (`E:\\x\\..` spells its way
+    past one), so the workspace goes through the same guard as any other
+    output directory: canonical path, volume identity against every approved
+    scan root, and the Windows system-drive rule.
+    """
+    workspace = (args.workspace or os.path.dirname(
+        cfg["output_dir"].rstrip("\\/")) or cfg["output_dir"]).strip().strip('"')
     if not os.path.isdir(workspace):
         raise SystemExit(f"workspace not found: {workspace}")
+    probe = normalize_root(workspace)
+    bare_share = is_unc(probe) and probe.strip("\\").count("\\") <= 1
+    if re.fullmatch(r"[A-Za-z]:[\\/]?", probe) or bare_share:
+        raise SystemExit(
+            f"refusing {workspace} as the workspace: it is the root of a "
+            f"whole drive or share, and this command writes into the "
+            f"workspace. Point --workspace at the folder holding the "
+            f"per-drive report folders (normally C:\\DEV\\triage).")
+    guard_output_dirs({**cfg, "output_dir": workspace,
+                       "scan_roots": _approved_scope(cfg)})
+    return workspace
+
+
+def cmd_crossdrive(cfg, args, logger):
+    """Compare every completed run in the workspace against each other."""
+    workspace = _resolve_workspace(cfg, args)
     logger.info("cross-drive analysis over %s", workspace)
     res = crossdrive.analyze(workspace, logger)
     print(f"\nCompared {len(res['runs'])} drives: {', '.join(res['runs'])}")
@@ -259,8 +301,36 @@ def cmd_crossdrive(cfg, args, logger):
     if res["gap_files"]:
         print(f"{res['gap_files']:,} files could not be compared "
               f"(never hashed) - see the report's Coverage section")
+    if res.get("unexamined"):
+        print(f"{res['unexamined']:,} inventory row(s) record something that "
+              f"could NOT be read; their contents are in no comparison")
     print(f"\nwrote {res['report']}")
     print(f"wrote {res['groups_csv']}")
+    return 0
+
+
+def cmd_hashgaps(cfg, args, logger):
+    """Hash only the files no run ever hashed, so crossdrive can see them."""
+    workspace = _resolve_workspace(cfg, args)
+    logger.info("closing the cross-drive coverage gap over %s", workspace)
+
+    def echo(msg):
+        # this pass can run for hours per drive, and the console handler only
+        # shows warnings, so say out loud which drive is being read
+        print(msg, flush=True)
+
+    print(f"Detailed progress goes to {cfg['log_dir']}")
+    res = hashgaps.run(workspace, logger, only=args.run or None, echo=echo)
+    print(f"\nGap list: {res['gap_total']:,} files that no run had hashed")
+    for line in hashgaps.format_summary(res):
+        print(line)
+    print(f"\n{res['full_hashed']:,} files newly full-hashed.")
+    if res["full_hashed"]:
+        print("Run Compare All Drives again to fold them into the "
+              "comparison.")
+    elif not res["processed"]:
+        print("No drive could be verified, so nothing was hashed. Attach a "
+              "drive that was scanned and run this again.")
     return 0
 
 
@@ -280,6 +350,7 @@ COMMANDS = {
     "classify": cmd_classify,
     "report": cmd_report,
     "crossdrive": cmd_crossdrive,
+    "hashgaps": cmd_hashgaps,
     "all": cmd_all,
 }
 
@@ -305,8 +376,11 @@ def main(argv=None):
                          "DELETED files drop out; hashes already computed "
                          "are reused, so unchanged files are not re-read")
     ap.add_argument("--workspace", default="",
-                    help="crossdrive: folder containing all run folders "
-                         "(default: parent of output_dir)")
+                    help="crossdrive/hashgaps: folder containing all run "
+                         "folders (default: parent of output_dir)")
+    ap.add_argument("--run", action="append", default=[],
+                    help="hashgaps: limit to these run folder NAMES "
+                         "(e.g. --run NAS_PHOTOS). Repeatable")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -325,8 +399,9 @@ def main(argv=None):
     # guard violation aborts before a single byte lands anywhere; `enumerate`
     # guards against an existing approved scope plus the Windows
     # system-drive rule for the output/log dirs themselves.
-    if args.command == "crossdrive":
-        # reads only completed run folders; no scan target involved
+    if args.command in ("crossdrive", "hashgaps"):
+        # operate on completed run folders, not a scan target;
+        # the workspace itself is guarded by _resolve_workspace
         guard_output_dirs({**cfg, "scan_roots": []})
     elif args.command in ("enumerate", "probe"):
         scope_path = os.path.join(cfg["output_dir"], "scope.json")

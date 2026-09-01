@@ -23,8 +23,8 @@ import os
 from collections import Counter, defaultdict
 
 from .util import (
-    HASH_COLUMNS, INVENTORY_COLUMNS, CsvRewriter, fmt_gb, read_csv_rows,
-    write_text,
+    HASH_COLUMNS, INVENTORY_COLUMNS, CsvRewriter, fmt_gb, norm_key,
+    read_csv_rows, write_text,
 )
 
 GROUP_COLUMNS = ["sha256", "size", "copies", "drives", "paths"]
@@ -58,6 +58,73 @@ def iter_hashes(run_dir):
             if row["error"] or not row["full_sha256"] or not row["size"]:
                 continue
             yield row["path"], int(row["size"]), row["full_sha256"]
+
+
+def prefix_status(run_dir):
+    """norm-keyed path -> (size, prefix_sha256, failure) for files that were
+    hashed but have no full hash.
+
+    Reads the full-hash CSVs too, so a whole-file read that FAILED is not
+    reported as a file whose prefix simply matched nothing - that would hide
+    a failing disk behind a benign explanation. `failure` is None when the
+    file was prefix-hashed cleanly, in which case the prefix is usable
+    evidence about whether a twin can exist at all.
+    """
+    out = {}
+    for csv_path in _csvs(run_dir, "hashes", "prefix-"):
+        for row in read_csv_rows(csv_path, HASH_COLUMNS):
+            key = norm_key(row["path"])
+            if row["full_sha256"]:
+                out.pop(key, None)
+            elif row["error"]:
+                out[key] = (None, None,
+                            f"could not be read while hashing: {row['error']}")
+            elif row["prefix_sha256"] and row["size"]:
+                out[key] = (int(row["size"]), row["prefix_sha256"], None)
+    for csv_path in _csvs(run_dir, "hashes", "full-"):
+        for row in read_csv_rows(csv_path, HASH_COLUMNS):
+            key = norm_key(row["path"])
+            if row["full_sha256"]:
+                out.pop(key, None)
+            elif row["error"]:
+                out[key] = (None, None,
+                            f"whole-file read failed: {row['error']}")
+    return out
+
+
+def global_prefix_census(runs):
+    """(size, prefix_sha256) -> how many distinct files in the WHOLE
+    workspace carry it.
+
+    A count of one is proof: no byte-identical twin can exist anywhere in
+    the fleet, because identical files necessarily share their first 64KB.
+    Those files are finished, and must stop being reported as uncompared."""
+    census = Counter()
+    for _name, run_dir in runs:
+        seen = {}
+        for csv_path in _csvs(run_dir, "hashes", "prefix-"):
+            for row in read_csv_rows(csv_path, HASH_COLUMNS):
+                if row["error"] or not row["prefix_sha256"] or not row["size"]:
+                    continue
+                seen[norm_key(row["path"])] = (int(row["size"]),
+                                               row["prefix_sha256"])
+        for value in seen.values():
+            census[value] += 1
+    return census
+
+
+def count_unexamined(run_dir):
+    """Inventory rows that record something the walk could not read.
+
+    These carry no size, so they contribute nothing to the census, the gap
+    count or any byte total - which would otherwise let this report claim
+    completeness over directories nobody ever listed."""
+    n = 0
+    for csv_path in _csvs(run_dir, "inventory", "inventory-"):
+        for row in read_csv_rows(csv_path, INVENTORY_COLUMNS):
+            if row["error"]:
+                n += 1
+    return n
 
 
 def iter_inventory_rows(run_dir):
@@ -142,34 +209,51 @@ def analyze(workspace, logger):
     # ---- gap analysis: what could not be compared -------------------------
     census = Counter()
     per_drive_sizes = {}
+    unexamined = 0
     for name, run_dir in runs:
         sizes = Counter()
         for _, size in iter_inventory_rows(run_dir):
             sizes[size] += 1
         per_drive_sizes[name] = sizes
         census.update(sizes)
+        unexamined += count_unexamined(run_dir)
 
+    pcensus = global_prefix_census(runs)
     gap_csv = os.path.join(out_dir, "manifests", "cross-drive-gaps.csv")
     gap_n, gap_bytes = 0, 0
     gap_by_drive = Counter()
     with CsvRewriter(gap_csv, GAP_COLUMNS) as w:
         for name, run_dir in runs:
             own = per_drive_sizes[name]
+            partial = prefix_status(run_dir)
             for path, size in iter_inventory_rows(run_dir):
                 if path in hashed_paths[name]:
                     continue
-                # size unique on its own drive (so never hashed) but present
-                # on at least one other drive: a possible cross-drive dupe
-                if census[size] > own[size]:
-                    gap_n += 1
-                    gap_bytes += size
-                    gap_by_drive[name] += 1
-                    w.write({
-                        "drive": name, "path": path, "size": size,
-                        "reason": "size matches a file on another drive but "
-                                  "was never hashed (was size-unique on its "
-                                  "own drive)",
-                    })
+                # A file with no full hash whose size also occurs on another
+                # drive MIGHT be a cross-drive duplicate nothing could find.
+                if census[size] <= own[size]:
+                    continue
+                state = partial.get(norm_key(path))
+                if state:
+                    psize, prefix, failure = state
+                    if failure is None and pcensus[(psize, prefix)] < 2:
+                        # its 64KB prefix is unique across the whole
+                        # workspace, so no identical twin can exist: settled
+                        # without ever reading the file whole
+                        continue
+                    reason = failure or (
+                        "prefix-hashed, and its first 64KB match another "
+                        "file in the fleet - only a whole-file hash can "
+                        "confirm or rule out a duplicate")
+                else:
+                    reason = ("never hashed: its size was unique on its own "
+                              "drive, so its run had nothing to compare it "
+                              "against")
+                gap_n += 1
+                gap_bytes += size
+                gap_by_drive[name] += 1
+                w.write({"drive": name, "path": path, "size": size,
+                         "reason": reason})
     if gap_n == 0:
         os.remove(gap_csv)
 
@@ -224,7 +308,9 @@ def analyze(workspace, logger):
             f"compared.** Each run only hashed files whose size repeated on "
             f"its own drive, so a file that was size-unique on its drive was "
             f"never hashed - even if an identical copy sits on another "
-            f"drive.",
+            f"drive. Files already proven unique by their 64KB prefix are "
+            f"NOT counted here; each row's `reason` column says what that "
+            f"particular file still needs.",
             "",
             "| Drive | Unhashed files that may have twins elsewhere |",
             "|---|---:|",
@@ -233,14 +319,22 @@ def analyze(workspace, logger):
             lines.append(f"| {d} | {n:,} |")
         lines += [
             "",
-            "`manifests/cross-drive-gaps.csv` lists them. Closing this gap "
-            "needs a hashing pass over those files only - far less work "
-            "than re-scanning the drives.",
+            "`manifests/cross-drive-gaps.csv` lists them, each with the "
+            "reason it has no hash. Run **Close the Gap.bat** "
+            "(`python -m triage hashgaps`) to hash exactly these files and "
+            "nothing else, then run this comparison again.",
             "",
         ]
     else:
         lines += ["Every file that could have a twin on another drive was "
-                  "hashed; this comparison is complete.", ""]
+                  "hashed.", ""]
+    if unexamined:
+        lines += [
+            f"Separately, {unexamined:,} inventory row(s) across these "
+            f"drives record a directory or file that could NOT be read. "
+            f"Their contents were never listed, carry no size, and are "
+            f"absent from every total above. They are in each drive's own "
+            f"decision list.", ""]
     lines += [
         "## Files",
         "",
@@ -254,4 +348,5 @@ def analyze(workspace, logger):
     write_text(report, "\n".join(lines) + "\n")
     return {"runs": [n for n, _ in runs], "groups": total_groups,
             "reclaimable": reclaimable, "gap_files": gap_n,
+            "unexamined": unexamined,
             "report": report, "groups_csv": group_csv}
