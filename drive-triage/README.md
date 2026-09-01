@@ -125,8 +125,9 @@ its 64KB prefix, so a twin pair split across two drives that both mount as
 owes a whole-file hash.
 
 **A drive that no longer holds what it held when it was scanned is refused,
-not guessed at.** Before touching one, a spread sample of files that run
-already hashed is re-read and the hashes must match; samples that are merely
+not guessed at.** On Windows the volume label and size stamped beside the
+inventory must still match what is mounted at that letter. Then a spread
+sample of files that run already hashed is re-read and the hashes must match; samples that are merely
 *absent* are disqualifying too, so a sibling drive that shares a few paths
 cannot pass on those. The check is repeated before the whole-file pass,
 which can start hours later, and every file is re-stat'd so a changed file
@@ -165,7 +166,7 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-81 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+82 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),

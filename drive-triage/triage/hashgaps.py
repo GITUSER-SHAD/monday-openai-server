@@ -19,6 +19,8 @@ drive's paths, which fabricates a duplicate - the one error that could later
 justify deleting the only copy of something. So a drive is hashed only while
 it proves it is the drive that was scanned:
 
+  * on Windows the volume label and size stamped beside the inventory when
+    it was built must still match what is mounted at that letter;
   * a spread sample of files that run already hashed is re-read and the
     hashes must match - metadata alone is never enough, because a clone or a
     timestamp-preserving copy reproduces size and mtime exactly;
@@ -45,13 +47,14 @@ from collections import Counter, defaultdict
 
 from .util import (
     HASH_COLUMNS, INVENTORY_COLUMNS, CsvAppender, extended_path, iso_utc,
-    norm_key, read_csv_rows,
+    load_json, norm_key, read_csv_rows,
 )
 from .hashing import (
     _load_hashed, _same_identity, sha256_full, sha256_prefix,
 )
 from .inventory import _Muffled, _is_permission_error
 from .crossdrive import CROSS_DIR, GAP_COLUMNS, find_runs
+from . import volumes as volumes_mod
 
 # How many already-hashed files to re-read to prove the right volume is
 # mounted, and how much slack to allow. The sample must be almost entirely
@@ -199,7 +202,33 @@ def _spread(items, n):
     return [items[int(i * step)] for i in range(n)]
 
 
-def verify_volume(run_dir, slug, logger, quiet=False):
+def recorded_volume_mismatch(run_dir, slug, signatures):
+    """Reason string when Windows says a different volume is at this letter.
+
+    `inventory` stamps the volume label+size beside each inventory as
+    inventory-<slug>.meta.json. When that stamp exists and disagrees with
+    what is mounted now, no amount of sampled content matters: it is a
+    different disk, and saying so by name beats inferring it from files.
+    """
+    if not signatures:
+        return None
+    prev = load_json(os.path.join(run_dir, "inventory",
+                                  f"inventory-{slug}.meta.json"))
+    if not prev:
+        return None
+    now = signatures.get(f"{slug.upper()}:")
+    if not now:
+        return None
+    if (prev.get("label"), prev.get("size")) != (now.get("label"),
+                                                 now.get("size")):
+        return (f"a different volume is mounted here: this run recorded "
+                f"{prev.get('label')!r} ({prev.get('size')} bytes), the "
+                f"drive present now is {now.get('label')!r} "
+                f"({now.get('size')} bytes)")
+    return None
+
+
+def verify_volume(run_dir, slug, logger, quiet=False, signatures=None):
     """Prove the volume currently at this run's paths is the one it scanned.
 
     Returns (ok, reason). Content only: a spread sample of files this run
@@ -208,6 +237,9 @@ def verify_volume(run_dir, slug, logger, quiet=False):
     has almost nothing to gain, since a drive with no hashes had no
     size collisions to begin with.
     """
+    mismatch = recorded_volume_mismatch(run_dir, slug, signatures)
+    if mismatch:
+        return False, mismatch
     prefix_csv, _ = hash_csvs(run_dir, slug)
     rows = []
     if os.path.exists(prefix_csv):
@@ -436,6 +468,7 @@ def run(workspace, logger, only=None, echo=None):
     """
     say = echo or (lambda _msg: None)
     only = {o.casefold() for o in only} if only else None
+    signatures = volumes_mod.volume_signatures(logger)
     by_drive = load_gaps(workspace, logger)
     plan, skipped = _plan(workspace, by_drive, only, logger)
     if only and not plan:
@@ -448,7 +481,8 @@ def run(workspace, logger, only=None, echo=None):
     errors = 0
     for name, run_dir, slug, paths in plan:
         label = name if len(run_slugs(run_dir)) == 1 else f"{name} [{slug}]"
-        ok, why = verify_volume(run_dir, slug, logger)
+        ok, why = verify_volume(run_dir, slug, logger,
+                                signatures=signatures)
         if not ok:
             logger.warning("SKIPPING %s: %s", label, why)
             skipped.append((label, why))
@@ -483,7 +517,8 @@ def run(workspace, logger, only=None, echo=None):
             processed.append((label, len(paths), 0))
             continue
         # hours may have passed and drives get swapped: prove it again
-        ok, why = verify_volume(run_dir, slug, logger, quiet=True)
+        ok, why = verify_volume(run_dir, slug, logger, quiet=True,
+                                signatures=signatures)
         if not ok:
             logger.warning("%s: volume changed since the first pass: %s",
                            label, why)

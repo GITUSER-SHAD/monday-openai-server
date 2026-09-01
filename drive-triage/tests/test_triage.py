@@ -1263,6 +1263,32 @@ class HashGapsTest(unittest.TestCase):
             _size, _pre, failure = state[list(state)[0]]
             self.assertIn("whole-file read failed", failure)
 
+    def test_recorded_volume_label_mismatch_is_refused_by_name(self):
+        """`inventory` stamps the volume label+size next to each inventory.
+        When Windows says a different volume is at that letter, say so by
+        name rather than inferring it from sampled files."""
+        from triage import hashgaps
+        from triage.util import atomic_write_json
+        with tempfile.TemporaryDirectory() as root:
+            rd = os.path.join(root, "run")
+            os.makedirs(os.path.join(rd, "inventory"))
+            atomic_write_json(
+                os.path.join(rd, "inventory", "inventory-F.meta.json"),
+                {"label": "T7-SHIELD", "size": 2000398934016})
+            sigs = {"F:": {"label": "WD_PASSPORT", "size": 4000787030016}}
+            why = hashgaps.recorded_volume_mismatch(rd, "F", sigs)
+            self.assertIn("different volume", why)
+            self.assertIn("T7-SHIELD", why)
+            self.assertIn("WD_PASSPORT", why)
+            ok, reason = hashgaps.verify_volume(rd, "F", self._log(),
+                                                signatures=sigs)
+            self.assertFalse(ok)
+            self.assertEqual(reason, why)
+            # same volume still mounted -> this gate says nothing
+            same = {"F:": {"label": "T7-SHIELD", "size": 2000398934016}}
+            self.assertIsNone(
+                hashgaps.recorded_volume_mismatch(rd, "F", same))
+
     def test_only_flag_limits_to_named_runs(self):
         from triage import crossdrive, hashgaps
         log = self._log()
