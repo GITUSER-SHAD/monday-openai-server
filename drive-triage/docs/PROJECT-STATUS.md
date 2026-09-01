@@ -100,8 +100,10 @@ were explicitly deferred by the owner.
 collision-free plan carrying SHA256 on every row. Deletes name their
 keeper's copy row and cannot precede it; a delete that cannot be proven is
 held and explained rather than emitted; destination clashes across drives
-are qualified by source drive, and a contradiction halts the build and
-invalidates any previous plan. See README, "The plan stage".
+are qualified by source drive; every row carries the volume label+size its
+drive was inventoried with, since all six externals mounted as `F:`; and a
+contradiction halts the build and invalidates any previous plan. See README,
+"The plan stage".
 
 ### D1 — Close the decision loop, or leave it advisory
 
@@ -180,9 +182,9 @@ before the execution phase.
 ## 7. Codebase facts
 
 - `drive-triage/triage/` — ~4,000 lines, Python 3.9+, stdlib only, zero deps.
-- `drive-triage/tests/test_triage.py` — 82 tests, all pass, 1 skipped as root.
-- Nine subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
-  `report`, `crossdrive`, `hashgaps`, `all`. Flags are global.
-- User-facing entry points are three `.bat` launchers — `Triage a Drive.bat`,
-  `Compare All Drives.bat`, `Close the Gap.bat`. The user runs the tool by
-  double-clicking; assume no CLI familiarity.
+- `drive-triage/tests/test_triage.py` — 99 tests, all pass, 1 skipped as root.
+- Ten subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
+  `report`, `crossdrive`, `hashgaps`, `plan`, `all`. Flags are global.
+- User-facing entry points are four `.bat` launchers — `Triage a Drive.bat`,
+  `Compare All Drives.bat`, `Close the Gap.bat`, `Build the Plan.bat`. The
+  user runs the tool by double-clicking; assume no CLI familiarity.

@@ -1750,6 +1750,28 @@ class PlanTest(unittest.TestCase):
             self.assertIn("keeper is not scheduled", report)
             self.assertIn("never deleted on its path alone", report)
 
+    def test_rows_carry_the_volume_signature_of_their_drive(self):
+        """All six externals mounted as F:, so a path alone does not name a
+        file. Every row must tell the executor which disk it means."""
+        from triage import plan
+        from triage.util import atomic_write_json
+        with tempfile.TemporaryDirectory() as ws:
+            a = "F:\\media\\keep.mp4"
+            rd = self._mkrun(ws, "DriveOne", [
+                {"path": a, "size": "10", "class": "MEDIA",
+                 "nas_tier": "fastwork", "proposed_path": "Job\\01_RAW"},
+            ], hash_rows=[(a, "10", self.SHA_A)])
+            atomic_write_json(
+                os.path.join(rd, "inventory", "inventory-X.meta.json"),
+                {"label": "T7-SHIELD", "size": 2000398934016})
+            res = plan.build(ws, self._log())
+            rows = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
+            self.assertEqual(len(rows), 1)
+            self.assertIn("T7-SHIELD", rows[0]["source_volume"])
+            self.assertIn("2000398934016", rows[0]["source_volume"])
+            with open(res["report"], encoding="utf-8") as fh:
+                self.assertIn("source_volume", fh.read())
+
     def test_zero_byte_junk_is_deletable_without_a_hash(self):
         from triage import plan
         with tempfile.TemporaryDirectory() as ws:

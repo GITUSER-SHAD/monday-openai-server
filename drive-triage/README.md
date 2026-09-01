@@ -162,6 +162,10 @@ in the plan:
   `plan-violations.csv` lists every offending row, `plan.csv` is emptied and
   the report replaced, so no stale plan can be executed.
 - UNKNOWN/hold rows are never planned — they belong to the decision list.
+- **every row names the disk it means.** All six externals mounted as `F:`,
+  so a path alone does not identify a file: each row carries the volume
+  label and size that drive was inventoried with, and the executor's first
+  rule is to confirm that volume is the one present.
 
 ## Reproducible classification
 
@@ -210,7 +214,7 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-98 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+99 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),

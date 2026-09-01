@@ -26,6 +26,11 @@ here, and halts on any mismatch. All safety is proven at plan time:
     plan is not written at all, every offending row is listed in
     plan-violations.csv, and any previous plan is invalidated.
 
+Every row also carries the volume signature its drive was inventoried
+with, because all six externals mounted as F:: the executor must confirm
+the right disk is present before acting on a row, since a path alone does
+not identify a file in this fleet.
+
 This stage is read-only against every drive: it reads only the CSVs the
 runs already wrote, and writes only under <workspace>/_plan/.
 
@@ -62,6 +67,9 @@ PLAN_COLUMNS = [
     "keeper_sha256",
     "class",
     "confidence",
+    "source_volume",  # volume label+size recorded when this drive was
+                      # inventoried; the executor must confirm it is what
+                      # is mounted before touching any row for this drive
     "note",           # anything done to this row that a reader must know
 ]
 
@@ -90,6 +98,26 @@ def _run_hashes(run_dir):
             else:
                 out[key] = row["full_sha256"]
     return out
+
+
+def run_volumes(run_dir):
+    """Volume signatures this run recorded, as 'LABEL (SIZE bytes)'.
+
+    Every drive in this fleet mounted as F:, so a path names a file only
+    once you know WHICH disk is at that letter. `inventory` stamps the
+    label and size beside each inventory; carrying it into the plan is what
+    lets an executor refuse to act on the wrong drive.
+    """
+    sigs = []
+    d = os.path.join(run_dir, "inventory")
+    if os.path.isdir(d):
+        for f in sorted(os.listdir(d)):
+            if f.startswith("inventory-") and f.endswith(".meta.json"):
+                meta = load_json(os.path.join(d, f)) or {}
+                if meta.get("label") is not None:
+                    sigs.append(f"{meta.get('label')} "
+                                f"({meta.get('size')} bytes)")
+    return " | ".join(sigs)
 
 
 def _iter_classified(run_dir):
@@ -141,8 +169,10 @@ def build(workspace, logger):
     held = defaultdict(int)
     held_bytes = 0
     hashes_by_run = {}
+    volumes = {}
     for name, run_dir in runs:
         hashes_by_run[name] = _run_hashes(run_dir)
+        volumes[name] = run_volumes(run_dir)
         for row in _iter_classified(run_dir):
             cls = row["class"]
             if cls in _COPY_CLASSES:
@@ -212,7 +242,8 @@ def build(workspace, logger):
             "verify": "sha256" if sha else "hash-at-copy",
             "nas_tier": tier, "dest_path": dest,
             "keeper_path": "", "keeper_sha256": "",
-            "class": cls, "confidence": conf, "note": note,
+            "class": cls, "confidence": conf,
+            "source_volume": volumes[name], "note": note,
         })
 
     # ---- pass 2: deletes. Provable, or not planned at all ----------------
@@ -239,7 +270,8 @@ def build(workspace, logger):
             "size": size_s, "sha256": sha, "verify": "sha256",
             "nas_tier": "", "dest_path": "",
             "keeper_path": dupe_of, "keeper_sha256": "",
-            "class": cls, "confidence": conf, "note": "",
+            "class": cls, "confidence": conf,
+            "source_volume": volumes[name], "note": "",
         }
         if cls == "DUPE_EXTERNAL":
             # the keeper lives on the same drive (dupe groups are per-run);
@@ -344,6 +376,7 @@ def build(workspace, logger):
         "tool_version": __version__,
         "workspace": workspace,
         "runs": provenance,
+        "volumes": {n: volumes[n] for n, _ in runs},
         "rows": {"copy": n_copy, "delete_candidate": n_del,
                  "merged_identical": merged,
                  "destinations_qualified": qualified,
@@ -405,6 +438,13 @@ def build(workspace, logger):
         "",
         "## Rules the executor must follow (in order, no exceptions)",
         "",
+        "0. Before touching ANY row, confirm the drive named by "
+        "`source_drive` is the one mounted: its `source_volume` (label and "
+        "size, recorded when that drive was inventoried) must match the "
+        "volume actually present. Every drive in this fleet mounted as "
+        "F:, so a path alone does not name a file. A blank "
+        "`source_volume` means no signature was recorded - re-verify that "
+        "drive by content before acting on its rows.",
         "1. Process rows in ascending `seq`. All copies precede all "
         "deletes by construction.",
         "2. A copy: create parent dirs; refuse to overwrite an existing "
@@ -419,7 +459,9 @@ def build(workspace, logger):
         "`depends_on` occurs only on JUNK rows, which have no keeper.",
         "4. Before any delete, re-hash `source_path` and require it to "
         "equal `sha256`. The sole exception is `verify` = zero-byte: "
-        "re-stat the file and require size 0.",
+        "re-stat the file and require size 0 (a file that has since gained "
+        "content is not the file this plan classified). No delete row "
+        "exists without one of those two proofs.",
         "5. Any verification failure halts the run. Never skip, never "
         "guess.",
         "",
@@ -427,7 +469,8 @@ def build(workspace, logger):
         "",
         "- `plan.csv` - the plan, one row per action",
         "- `plan-info.json` - provenance: tool version, per-run "
-        "classification records, row and byte totals",
+        "classification records, recorded volume signatures, row and byte "
+        "totals",
         "",
     ]))
     logger.info("plan: %d copies, %d delete-candidates, %d merged, "
