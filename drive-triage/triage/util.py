@@ -1,7 +1,7 @@
 """Shared utilities: config, logging, CSV I/O, checkpoints, read-only guards.
 
 Design rules enforced here:
-  * No network imports anywhere in this package (tested by tests/test_security.py).
+  * No network imports anywhere in this package (tested by tests/test_triage.py::SecurityTest).
   * All writes are confined to config output_dir / log_dir, which must lie
     outside every scan root (guard_output_dirs).
   * Checkpoint/state writes are atomic (temp file + os.replace) so a crash
