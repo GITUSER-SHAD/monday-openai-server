@@ -9,6 +9,7 @@
   python -m triage all        (inventory -> hash -> classify -> report)
   python -m triage crossdrive [--workspace C:\\DEV\\triage]
   python -m triage hashgaps   [--workspace C:\\DEV\\triage] [--run NAME]
+  python -m triage plan       [--workspace C:\\DEV\\triage]
 
 Every command is read-only with respect to scanned drives and resumable:
 interrupt at any point and re-run the same command. Verbose progress goes to
@@ -37,6 +38,7 @@ from .classify import run_classify
 from .report import run_reports
 from . import crossdrive
 from . import hashgaps
+from . import plan as plan_mod
 
 
 def _resolve_roots(cfg, args, logger):
@@ -222,18 +224,91 @@ def cmd_hash(cfg, args, logger):
     return 0
 
 
-def _set_activity_cutoff(cfg):
-    cutoff = datetime.now(timezone.utc) - timedelta(
-        days=int(cfg["active_project_days"]))
-    cfg["_activity_cutoff_iso"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+def _run_info_path(cfg):
+    return os.path.join(cfg["output_dir"], "run-info.json")
+
+
+def _shared_cutoff_path(cfg):
+    """Where the ONE activity cutoff for the whole fleet lives.
+
+    Each target is triaged into its own output folder, so a per-folder
+    cutoff would give every drive a different one - whichever day it
+    happened to be scanned - and the fastwork/hdd-mirror line would move
+    from drive to drive. The cutoff belongs to the workspace that holds all
+    the run folders, so every drive is measured against the same date.
+    """
+    parent = os.path.dirname(cfg["output_dir"].rstrip("\\/"))
+    return os.path.join(parent or cfg["output_dir"], "activity-cutoff.json")
+
+
+def _set_activity_cutoff(cfg, args, logger):
+    """Fix the activity cutoff for this run - and KEEP it fixed.
+
+    The fastwork / hdd-mirror split hangs on this one date, and it used to
+    be recomputed from the clock on every classify, so merely re-running
+    months later silently moved projects between tiers and changed the NAS
+    sizing with no record of why. Now: the first classify computes it,
+    records it in run-info.json, and every later classify reuses the
+    recorded date - identical inputs give identical classification. It only
+    changes when the user says so (--cutoff).
+    """
+    if getattr(args, "cutoff", ""):
+        try:
+            datetime.strptime(args.cutoff, "%Y-%m-%d")
+        except ValueError:
+            raise SystemExit(
+                f"--cutoff must be a real date as YYYY-MM-DD, got "
+                f"{args.cutoff!r}")
+        cfg["_activity_cutoff_iso"] = args.cutoff + "T00:00:00Z"
+        source = "set by --cutoff"
+    else:
+        recorded = (load_json(_shared_cutoff_path(cfg)) or {}).get(
+            "activity_cutoff_iso") or \
+            (load_json(_run_info_path(cfg)) or {}).get("activity_cutoff_iso")
+        if recorded:
+            cfg["_activity_cutoff_iso"] = recorded
+            source = "recorded by an earlier classify run (use --cutoff to " \
+                     "change it for every drive)"
+        else:
+            cutoff = datetime.now(timezone.utc) - timedelta(
+                days=int(cfg["active_project_days"]))
+            cfg["_activity_cutoff_iso"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+            source = f"today minus active_project_days=" \
+                     f"{cfg['active_project_days']} - recorded now, so every "\
+                     f"other drive is measured against this same date"
+    logger.info("activity cutoff %s (%s)", cfg["_activity_cutoff_iso"],
+                source)
+    try:
+        atomic_write_json(_shared_cutoff_path(cfg), {
+            "activity_cutoff_iso": cfg["_activity_cutoff_iso"],
+            "active_project_days": cfg["active_project_days"]})
+    except OSError as exc:   # a read-only or absent parent must not abort
+        logger.warning("could not record the shared activity cutoff (%s); "
+                       "this drive still uses %s", exc,
+                       cfg["_activity_cutoff_iso"])
+
+
+def _write_run_info(cfg, args, roots):
+    """The provenance record every output in this run folder belongs to."""
+    atomic_write_json(_run_info_path(cfg), {
+        "tool_version": __version__,
+        "activity_cutoff_iso": cfg["_activity_cutoff_iso"],
+        "active_project_days": cfg["active_project_days"],
+        "config": args.config or "(built-in defaults)",
+        "d_reference_csv": cfg["d_reference_csv"] or "(none)",
+        "scan_roots": list(roots),
+        "classified_at_utc": datetime.now(timezone.utc)
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+    })
 
 
 def cmd_classify(cfg, args, logger):
     roots = _resolve_roots(cfg, args, logger)
     check_hash_marker(cfg, roots)
-    _set_activity_cutoff(cfg)
+    _set_activity_cutoff(cfg, args, logger)
     dref = _dref(cfg, logger)
     stats = run_classify(cfg, roots, dref, logger)
+    _write_run_info(cfg, args, roots)
     for root, counts in stats.items():
         print(f"{root}: " + ", ".join(
             f"{k}={v:,}" for k, v in sorted(counts.items())))
@@ -334,6 +409,25 @@ def cmd_hashgaps(cfg, args, logger):
     return 0
 
 
+def cmd_plan(cfg, args, logger):
+    """One verified, ordered, collision-free plan over every classified run."""
+    workspace = _resolve_workspace(cfg, args)
+    logger.info("building execution plan over %s", workspace)
+    res = plan_mod.build(workspace, logger)
+    print(f"\nPLAN WRITTEN - nothing was executed.")
+    print(f"  {res['copies']:,} copies ({fmt_gb(res['copy_bytes'])}), "
+          f"{res['deletes']:,} delete-candidates "
+          f"({fmt_gb(res['delete_bytes'])})")
+    print(f"  {res['merged']:,} identical sources merged, "
+          f"{res['qualified']:,} destinations qualified by source drive")
+    print(f"  HELD OUT: {res['held']:,} undecided rows (decision list), "
+          f"{res['held_deletes']:,} deletes that could not be proven "
+          f"({fmt_gb(res['held_delete_bytes'])}) - see the report")
+    print(f"\nwrote {res['plan_csv']}")
+    print(f"wrote {res['report']}")
+    return 0
+
+
 def cmd_all(cfg, args, logger):
     cmd_inventory(cfg, args, logger)
     cmd_hash(cfg, args, logger)
@@ -351,6 +445,7 @@ COMMANDS = {
     "report": cmd_report,
     "crossdrive": cmd_crossdrive,
     "hashgaps": cmd_hashgaps,
+    "plan": cmd_plan,
     "all": cmd_all,
 }
 
@@ -371,6 +466,11 @@ def main(argv=None):
                     help="override d_reference_csv")
     ap.add_argument("--max-files", type=int, default=None,
                     help="stop each stage after N new rows (testing/resume)")
+    ap.add_argument("--cutoff", default="",
+                    help="classify: freeze the fastwork-activity cutoff to "
+                         "this date (YYYY-MM-DD) and record it; otherwise "
+                         "the date recorded by the previous classify run is "
+                         "reused")
     ap.add_argument("--refresh", action="store_true",
                     help="re-walk the target's file list from scratch so "
                          "DELETED files drop out; hashes already computed "
@@ -399,7 +499,7 @@ def main(argv=None):
     # guard violation aborts before a single byte lands anywhere; `enumerate`
     # guards against an existing approved scope plus the Windows
     # system-drive rule for the output/log dirs themselves.
-    if args.command in ("crossdrive", "hashgaps"):
+    if args.command in ("crossdrive", "hashgaps", "plan"):
         # operate on completed run folders, not a scan target;
         # the workspace itself is guarded by _resolve_workspace
         guard_output_dirs({**cfg, "scan_roots": []})

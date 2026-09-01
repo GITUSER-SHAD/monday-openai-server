@@ -90,9 +90,18 @@ NAS_VIDEO 132 · SAMSUNG_T5_1TB_A 126.
 
 ## 4. Open direction decisions
 
-D3 (close the gap) is **built and shipped**. Three remain. **Settle D2 before
-D1** — the manifest shape determines what an answer to a decision-list
-question has to produce.
+D2 (the plan stage) and D3 (close the gap) are **built and shipped**, along
+with the two high-severity classification defects. D1 and D4 remain, and
+were explicitly deferred by the owner.
+
+### D2 — the plan stage — DONE
+
+`python -m triage plan` (Build the Plan.bat) emits one ordered,
+collision-free plan carrying SHA256 on every row. Deletes name their
+keeper's copy row and cannot precede it; a delete that cannot be proven is
+held and explained rather than emitted; destination clashes across drives
+are qualified by source drive, and a contradiction halts the build and
+invalidates any previous plan. See README, "The plan stage".
 
 ### D1 — Close the decision loop, or leave it advisory
 

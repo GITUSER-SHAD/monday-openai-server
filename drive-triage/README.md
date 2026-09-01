@@ -136,6 +136,50 @@ this exists because recording one drive's bytes under another drive's paths
 would fabricate a duplicate — the one error that could later justify
 deleting the only copy of something.
 
+## The plan stage
+
+```bat
+python -m triage plan --workspace C:\DEV\triage    rem Build the Plan.bat
+```
+
+Everything before this is analysis; everything after it is the future,
+separately approved execution phase. `plan` turns every drive's
+classification into ONE ordered plan so the executor never has to reason —
+it replays rows in `seq` order and verifies each against the hashes recorded
+in the plan:
+
+- **every delete carries byte-certain proof.** A duplicate names its
+  keeper's copy row in `depends_on`, and both hashes are recorded, so a
+  delete is unreachable until that keeper is on the NAS and verified. A
+  delete that cannot be proven is **held**, counted and explained — a delete
+  that does not happen costs disk, never data.
+- **no two rows share a destination.** Byte-identical sources merge into one
+  copy. Different content aimed at one path is qualified with the drive it
+  came from (drives are scanned one at a time, so classification cannot see
+  the clash); a collision that survives qualification halts the build.
+- **a contradiction halts everything.** If classification calls two files
+  duplicates but their recorded hashes differ, no plan is written at all:
+  `plan-violations.csv` lists every offending row, `plan.csv` is emptied and
+  the report replaced, so no stale plan can be executed.
+- UNKNOWN/hold rows are never planned — they belong to the decision list.
+
+## Reproducible classification
+
+The fastwork/hdd-mirror split turns on one date. That date is computed once,
+recorded in `activity-cutoff.json` beside the run folders, and reused by
+every later `classify` — including the other drives, which are scanned on
+different days and would otherwise each get their own. `--cutoff YYYY-MM-DD`
+changes it deliberately. Every run folder also carries `run-info.json` (tool
+version, cutoff, config, D reference, roots, timestamp) and every report
+opens with that provenance line, so a number read months later says which
+rules and which date produced it.
+
+Projects are identified by their **directory path**, not their folder name:
+two unrelated "Smith Wedding" folders never share an activity timestamp, and
+when their names would collide in the destination they are qualified (by
+parent folder, else by a stable identity hash) so their same-named camera
+files cannot overwrite each other.
+
 ## Outputs (all under `output_dir`, default `C:\DEV\triage\`)
 
 ```
@@ -166,7 +210,7 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-82 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+98 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),

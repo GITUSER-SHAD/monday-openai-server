@@ -19,6 +19,7 @@ proposed_path is ALWAYS a destination FOLDER; proposed_name is the new
 filename ("" = keep the current name). Every row carries evidence.
 """
 
+import hashlib
 import os
 import re
 
@@ -353,26 +354,77 @@ FASTWORK_MAP = [
 ]
 
 
-def project_from_parts(parts):
-    """Nearest non-generic ancestor dir; '' if file is loose at root."""
-    for seg in reversed(parts[:-1]):
+def project_of(parts):
+    """(name, key) for the file's project.
+
+    `name` is the nearest non-generic ancestor directory; `key` is that
+    directory's full path within its drive. The KEY is the project's
+    identity everywhere - two folders that merely share a name (a 2016 and
+    a 2024 "Smith Wedding" in different places) are two different projects:
+    they must not share an activity timestamp, and above all they must not
+    be proposed into the same destination, where their same-named camera
+    files (C0010.MP4 ...) would collide.
+    """
+    for i in range(len(parts) - 2, -1, -1):
+        seg = parts[i]
         low = seg.casefold()
         if low in GENERIC_MEDIA_DIRS or _CARD_DIR.match(seg):
             continue
         if re.fullmatch(r"(19[89]\d|20[0-3]\d)", seg.strip()):
             continue  # pure year folder; "2023 Acme Rebrand" stays a project
-        return seg
-    return ""
+        return seg, "\\".join(parts[:i + 1])
+    return "", ""
 
 
-def _project_rel_dirs(parts, project):
-    """Directory path INSIDE the project (after its nearest occurrence)."""
-    idx = None
-    for i in range(len(parts) - 2, -1, -1):  # nearest ancestor occurrence
-        if parts[i] == project:
-            idx = i
-            break
-    return parts[idx + 1:-1] if idx is not None else parts[:-1]
+def project_from_parts(parts):
+    """Nearest non-generic ancestor dir; '' if file is loose at root."""
+    return project_of(parts)[0]
+
+
+def project_aliases(projects_by_root):
+    """(norm_key(root), project key casefolded) -> display name, for every
+    project whose name is not unique in this run.
+
+    Destinations are built from the project's NAME, so distinct projects
+    that share a (sanitized) name would still land in one folder. Each such
+    group is qualified: by the project's parent directory when that tells
+    them apart, else by a short stable hash of the project's identity. The
+    result is checked against every OTHER project's plain name and every
+    alias already issued, so qualifying can never recreate the collision it
+    exists to prevent. Everything is derived from sorted inputs and a
+    content hash, so re-running renames nothing.
+    """
+    taken, by_name = set(), {}
+    for root in sorted(projects_by_root):
+        for _cf, (key, name) in sorted(projects_by_root[root].items()):
+            if not key:
+                continue
+            plain = sanitize_component(name).casefold()
+            taken.add(plain)
+            by_name.setdefault(plain, []).append((root, key, name))
+
+    aliases = {}
+    for plain in sorted(by_name):
+        group = by_name[plain]
+        if len(group) < 2:
+            continue
+        parents = [key.split("\\")[-2] if "\\" in key else ""
+                   for _, key, _ in group]
+        distinct = len(set(p.casefold() for p in parents)) == len(group) \
+            and all(parents)
+        for (root, key, name), parent in zip(group, parents):
+            tag = hashlib.sha1(
+                (norm_key(root) + "|" + key.casefold())
+                .encode("utf-8", "surrogatepass")).hexdigest()[:6]
+            candidate = sanitize_component(f"{name} ({parent})") if distinct \
+                else sanitize_component(f"{name} ~{tag}")
+            if candidate.casefold() in taken:
+                # the qualified name is itself taken - by a real project or
+                # by another group's alias. The identity hash cannot clash.
+                candidate = sanitize_component(f"{name} ~{tag}")
+            taken.add(candidate.casefold())
+            aliases[(norm_key(root), key.casefold())] = candidate
+    return aliases
 
 
 def fastwork_subfolder(rel_dirs, ext):
@@ -402,19 +454,27 @@ def fastwork_subfolder(rel_dirs, ext):
 
 
 def collect_project_activity(cfg, root):
-    """(project -> newest media mtime) for one drive, so one project lands
-    on ONE NAS tier instead of splitting per-file."""
-    latest = {}
+    """(activity, projects) for one drive.
+
+    activity: project KEY -> newest media mtime, so one project lands on ONE
+    NAS tier instead of splitting per-file - and only that one project: the
+    key is the project directory's path, so a same-named folder elsewhere
+    cannot inherit this one's recency and get dragged onto fastwork.
+    projects: project KEY -> name, for alias building.
+    """
+    latest, projects = {}, {}
     for row in iter_inventory(cfg, root):
         if row["error"] or row["ext"] not in MEDIA_EXT:
             continue
         parts = _split_rel(root, row["path"])
         if not parts:
             continue
-        project = project_from_parts(parts) or "_loose files"
-        if row["modified_utc"] > latest.get(project, ""):
-            latest[project] = row["modified_utc"]
-    return latest
+        name, pkey = project_of(parts)
+        cf = pkey.casefold()
+        projects[cf] = (pkey, name or "_loose files")
+        if row["modified_utc"] > latest.get(cf, ""):
+            latest[cf] = row["modified_utc"]
+    return latest, projects
 
 
 # ---------------------------------------------------------------------------
@@ -558,22 +618,35 @@ def run_classify(cfg, roots, dref, logger):
                 "%d keeper groups, %d probable-vs-D",
                 len(d_dupes), len(ext_dupes), len(keepers), len(probable_d))
 
+    # Project activity and names are collected for EVERY root before any
+    # classification, because destination names must be disambiguated across
+    # the whole run: two same-named projects - wherever they live - must
+    # never be proposed into one folder.
+    activity_by_root, projects_by_root = {}, {}
+    for root in roots:
+        logger.info("classify: %s - measuring project activity", root)
+        activity_by_root[root], projects_by_root[root] = \
+            collect_project_activity(cfg, root)
+    aliases = project_aliases(projects_by_root)
+    if aliases:
+        logger.info("classify: %d project(s) share a name and were given "
+                    "distinct destination names", len(aliases))
+
     stats = {}
     for root in roots:
         logger.info("classify: %s - detecting archive boxes", root)
         box_map = detect_boxes(root, iter_inventory(cfg, root), logger)
         logger.info("classify: %s - detecting git repositories", root)
         repo_roots = detect_repos(root, iter_inventory(cfg, root))
-        logger.info("classify: %s - measuring project activity", root)
-        activity = collect_project_activity(cfg, root)
+        activity = activity_by_root[root]
         logger.info("classify: %s - classifying files", root)
         counts = {}
         with CsvRewriter(classify_paths(cfg, root), CLASSIFY_COLUMNS) as out:
             done_n = 0
             for row in iter_inventory(cfg, root):
                 rec = _classify_row(cfg, root, row, box_map, repo_roots,
-                                    activity, d_dupes, ext_dupes, keepers,
-                                    probable_d, group_members)
+                                    activity, aliases, d_dupes, ext_dupes,
+                                    keepers, probable_d, group_members)
                 out.write(rec)
                 counts[rec["class"]] = counts.get(rec["class"], 0) + 1
                 done_n += 1
@@ -585,8 +658,8 @@ def run_classify(cfg, roots, dref, logger):
     return stats
 
 
-def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
-                  ext_dupes, keepers, probable_d, group_members):
+def _classify_row(cfg, root, row, box_map, repo_roots, activity, aliases,
+                  d_dupes, ext_dupes, keepers, probable_d, group_members):
     parts = _split_rel(root, row["path"])
     name = parts[-1] if parts else os.path.basename(row["path"])
     ext = row["ext"]
@@ -720,8 +793,8 @@ def _classify_row(cfg, root, row, box_map, repo_roots, activity, d_dupes,
     if ext in MEDIA_EXT and not (
             ext in {"jpg", "jpeg", "png", "pdf"} and
             SCANNED_RECORD_HINTS.search(name)):
-        return _classify_media(cfg, done, parts, name, ext, row, activity,
-                               keeper_note, probable_note)
+        return _classify_media(cfg, root, done, parts, name, ext, row,
+                               activity, aliases, keeper_note, probable_note)
 
     # ----- records ----------------------------------------------------------
     if ext in DOC_EXT or (ext in {"jpg", "jpeg", "png"} and
@@ -767,10 +840,11 @@ def _is_junk(parts, name, ext, size):
     return False, "", ""
 
 
-def _classify_media(cfg, done, parts, name, ext, row, activity, keeper_note,
-                    probable_note):
+def _classify_media(cfg, root, done, parts, name, ext, row, activity,
+                    aliases, keeper_note, probable_note):
     year, year_src = parse_year(parts, name, row["modified_utc"])
-    project = project_from_parts(parts)
+    project, pkey = project_of(parts)
+    pkey = pkey.casefold()
     hay = "/".join(parts)
     personal = next(
         (k for k in cfg["personal_shoot_keywords"]
@@ -795,9 +869,14 @@ def _classify_media(cfg, done, parts, name, ext, row, activity, keeper_note,
     else:
         ev.append(f"project {project!r} from path")
 
-    project_c = sanitize_component(project)
-    rel_dirs = _project_rel_dirs(parts, project) if project != "_loose files" \
-        else []
+    # The destination name: the alias when this project shares its name with
+    # another one anywhere in this run - otherwise same-named camera files
+    # from two unrelated projects would be planned into one folder.
+    alias = aliases.get((norm_key(root), pkey)) if pkey else None
+    if alias:
+        ev.append(f"renamed to {alias!r}: another project shares this name")
+    project_c = alias or sanitize_component(project)
+    rel_dirs = parts[pkey.count("\\") + 1:-1] if pkey else []
     rel_dir = "\\".join(rel_dirs)
 
     if personal:
@@ -808,7 +887,7 @@ def _classify_media(cfg, done, parts, name, ext, row, activity, keeper_note,
         sub = "personal-shoot"
     else:
         cutoff = cfg.get("_activity_cutoff_iso", "")
-        newest = activity.get(project, row["modified_utc"])
+        newest = activity.get(pkey, row["modified_utc"])
         active = bool(cutoff and newest and newest >= cutoff)
         if active:
             folder, remaining, map_ev = fastwork_subfolder(rel_dirs, ext)

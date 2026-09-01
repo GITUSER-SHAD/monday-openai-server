@@ -36,6 +36,24 @@ ACTION_BY_CLASS = {
 }
 
 
+def provenance_line(cfg):
+    """One line naming the classification this output was produced from -
+    tool version, activity cutoff, config, D reference - so a report read
+    months from now says which rules and which date produced its numbers."""
+    from .util import load_json
+    info = load_json(os.path.join(cfg["output_dir"], "run-info.json")) or {}
+    return ("Produced by drive-triage v{v} - activity cutoff {cut} - "
+            "config {conf} - D reference {dref} - classified {at}").format(
+        # never fill in the RUNNING version for a classification made by an
+        # older build: an unrecorded version must read as unrecorded
+        v=info.get("tool_version", "(unrecorded)"),
+        cut=info.get("activity_cutoff_iso",
+                     cfg.get("_activity_cutoff_iso", "(unrecorded)")),
+        conf=info.get("config", "(unrecorded)"),
+        dref=info.get("d_reference_csv", "(unrecorded)"),
+        at=info.get("classified_at_utc", "(unrecorded)"))
+
+
 def iter_classified(cfg, root):
     path = classify_paths(cfg, root)
     if not os.path.exists(path):
@@ -87,6 +105,8 @@ def per_drive_report(cfg, root):
 
     lines = [
         f"# Triage report - drive {slug} ({root})",
+        "",
+        provenance_line(cfg),
         "",
         f"Files: {total_files:,}   Data: {fmt_gb(total_bytes)}",
         "",
@@ -190,6 +210,7 @@ def master_plan(cfg, roots):
                 tree[key][1] += sz
 
     lines = ["# Master consolidated triage plan", "",
+             provenance_line(cfg), "",
              f"Drives: {', '.join(drive_slug(r) for r in roots)}",
              "", "## Totals by class", "",
              "| Class | Files | Size |", "|---|---:|---:|"]
@@ -274,6 +295,7 @@ def decision_list(cfg, roots):
                 g["ex"].append(r["path"])
 
     lines = ["# Decision list - answer in bulk", "",
+             provenance_line(cfg), "",
              "Each line is one judgment call covering the whole group. "
              "Reply like: `D3: media, year 2019` or `D7: junk, delete`.",
              ""]

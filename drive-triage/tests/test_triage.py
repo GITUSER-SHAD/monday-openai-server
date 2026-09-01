@@ -1321,5 +1321,446 @@ class HashGapsTest(unittest.TestCase):
             self.assertRegex(str(ctx.exception), "refusing|not found")
 
 
+
+class ProjectIdentityTest(unittest.TestCase):
+    """A project is its directory PATH, not its NAME. Two folders that merely
+    share a name must not share an activity timestamp (a 2024 shoot must not
+    drag a 2016 shoot onto fastwork) and must never be proposed into the
+    same destination, where their same-named camera files would collide."""
+
+    def _media(self, path, mtime=None):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(os.urandom(64) + path.encode("utf-8", "replace"))
+        if mtime is not None:
+            os.utime(path, (mtime, mtime))
+        return path
+
+    def _pipeline(self, base, roots):
+        out = os.path.join(base, "out")
+        logs = os.path.join(base, "logs")
+        common = []
+        for r in roots:
+            common += ["--drive", r]
+        common += ["--output-dir", out, "--log-dir", logs]
+        for cmd in ("inventory", "hash", "classify"):
+            rc, _ = run_cli(cmd, *common)
+            self.assertEqual(rc, 0, f"{cmd} failed")
+        rows = {}
+        for r in roots:
+            slug = os.path.basename(r)
+            rows.update(rows_by_path(
+                os.path.join(out, "classify", f"classify-{slug}.csv"),
+                CLASSIFY_COLUMNS))
+        return out, rows
+
+    def test_same_named_projects_on_one_drive_stay_separate(self):
+        import time
+        old_ts = 1451606400  # 2016-01-01: far outside active_project_days
+        with tempfile.TemporaryDirectory() as base:
+            drive = os.path.join(base, "driveE")
+            fresh = self._media(os.path.join(
+                drive, "ClientA", "Smith Job", "RAW", "clip1.mp4"),
+                time.time() - 3600)
+            stale = self._media(os.path.join(
+                drive, "ClientB", "Smith Job", "RAW", "clip2.mp4"), old_ts)
+            _, rows = self._pipeline(base, [drive])
+
+            r_fresh, r_stale = rows[fresh], rows[stale]
+            # the 2016 project must NOT inherit the 2025 project's recency
+            self.assertEqual(r_fresh["nas_tier"], "fastwork")
+            self.assertEqual(r_stale["nas_tier"], "hdd-mirror",
+                             "a same-named project's activity leaked")
+            # and the two projects get two destinations
+            self.assertNotEqual(r_fresh["proposed_path"],
+                                r_stale["proposed_path"])
+            self.assertIn("(ClientA)", r_fresh["proposed_path"])
+            self.assertIn("(ClientB)", r_stale["proposed_path"])
+
+    def test_same_named_projects_on_two_drives_get_distinct_destinations(self):
+        import time
+        now = time.time() - 3600
+        with tempfile.TemporaryDirectory() as base:
+            e = os.path.join(base, "driveE")
+            f = os.path.join(base, "driveF")
+            a = self._media(os.path.join(
+                e, "ClientX", "Smith Job", "RAW", "C0010.MP4"), now)
+            b = self._media(os.path.join(
+                f, "ClientY", "Smith Job", "RAW", "C0010.MP4"), now)
+            _, rows = self._pipeline(base, [e, f])
+            pa, pb = rows[a]["proposed_path"], rows[b]["proposed_path"]
+            # both active -> both fastwork; but never the same folder, or
+            # the two C0010.MP4 would collide in the copy phase
+            self.assertEqual(rows[a]["nas_tier"], "fastwork")
+            self.assertEqual(rows[b]["nas_tier"], "fastwork")
+            self.assertNotEqual(pa.casefold(), pb.casefold())
+
+    def test_unique_project_name_is_not_renamed(self):
+        import time
+        with tempfile.TemporaryDirectory() as base:
+            drive = os.path.join(base, "driveE")
+            p = self._media(os.path.join(
+                drive, "2023 Acme Rebrand", "RAW", "A001.mp4"),
+                time.time() - 3600)
+            _, rows = self._pipeline(base, [drive])
+            self.assertTrue(rows[p]["proposed_path"].startswith(
+                "2023 Acme Rebrand\\"), rows[p]["proposed_path"])
+
+
+    def test_alias_never_collides_with_a_real_project_name(self):
+        """Qualifying "Smith Job" under parent "2016" yields
+        "Smith Job (2016)" - which must not be handed out when a project is
+        literally called that."""
+        from triage.classify import project_aliases
+        root = "E:\\"
+        projects = {
+            "e:\\2016\\smith job": ("2016\\Smith Job", "Smith Job"),
+            "e:\\2024\\smith job": ("2024\\Smith Job", "Smith Job"),
+            "e:\\other\\smith job (2016)": ("other\\Smith Job (2016)",
+                                             "Smith Job (2016)"),
+        }
+        aliases = project_aliases({root: projects})
+        issued = sorted(aliases.values())
+        self.assertEqual(len(set(a.casefold() for a in issued)), len(issued))
+        for a in issued:
+            self.assertNotEqual(a.casefold(), "smith job (2016)")
+
+    def test_aliases_are_stable_across_runs(self):
+        from triage.classify import project_aliases
+        projects = {
+            "e:\\a\\job": ("a\\Job", "Job"),
+            "e:\\b\\job": ("b\\Job", "Job"),
+        }
+        first = project_aliases({"E:\\": projects})
+        second = project_aliases({"E:\\": dict(reversed(
+            list(projects.items())))})
+        self.assertEqual(first, second)
+
+
+class ProvenanceTest(unittest.TestCase):
+    """Classification must be reproducible: the activity cutoff is computed
+    once, recorded, and reused - and every run folder carries a provenance
+    record naming the version, cutoff and inputs that produced it."""
+
+    def _setup(self, base):
+        import time
+        drive = os.path.join(base, "driveE")
+        path = os.path.join(drive, "Client", "Fresh Job", "RAW", "c.mp4")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "wb") as fh:
+            fh.write(b"movie" * 100)
+        os.utime(path, (time.time() - 3600,) * 2)
+        out = os.path.join(base, "out")
+        common = ["--drive", drive, "--output-dir", out,
+                  "--log-dir", os.path.join(base, "logs")]
+        for cmd in ("inventory", "hash"):
+            rc, _ = run_cli(cmd, *common)
+            self.assertEqual(rc, 0)
+        return drive, path, out, common
+
+    def test_cutoff_recorded_and_classify_reproducible(self):
+        import json
+        with tempfile.TemporaryDirectory() as base:
+            drive, path, out, common = self._setup(base)
+            rc, _ = run_cli("classify", *common)
+            self.assertEqual(rc, 0)
+            info_path = os.path.join(out, "run-info.json")
+            with open(info_path, encoding="utf-8") as fh:
+                info = json.load(fh)
+            for field in ("tool_version", "activity_cutoff_iso", "config",
+                          "d_reference_csv", "scan_roots",
+                          "classified_at_utc"):
+                self.assertIn(field, info)
+
+            csv_path = os.path.join(out, "classify",
+                                    "classify-driveE.csv")
+            with open(csv_path, "rb") as fh:
+                first = fh.read()
+            rc, _ = run_cli("classify", *common)
+            self.assertEqual(rc, 0)
+            with open(csv_path, "rb") as fh:
+                second = fh.read()
+            self.assertEqual(first, second,
+                             "re-running classify with recorded inputs "
+                             "must be byte-identical")
+
+    def test_recorded_cutoff_is_actually_used(self):
+        import json
+        with tempfile.TemporaryDirectory() as base:
+            drive, path, out, common = self._setup(base)
+            rc, _ = run_cli("classify", *common)
+            self.assertEqual(rc, 0)
+            rows = rows_by_path(os.path.join(out, "classify",
+                                             "classify-driveE.csv"),
+                                CLASSIFY_COLUMNS)
+            self.assertEqual(rows[path]["nas_tier"], "fastwork")
+            # push the recorded cutoff into the future: nothing is active
+            shared = os.path.join(os.path.dirname(out),
+                                  "activity-cutoff.json")
+            with open(shared, "w", encoding="utf-8") as fh:
+                json.dump({"activity_cutoff_iso": "2999-01-01T00:00:00Z"}, fh)
+            rc, _ = run_cli("classify", *common)
+            self.assertEqual(rc, 0)
+            rows = rows_by_path(os.path.join(out, "classify",
+                                             "classify-driveE.csv"),
+                                CLASSIFY_COLUMNS)
+            self.assertEqual(rows[path]["nas_tier"], "hdd-mirror",
+                             "the recorded cutoff was not used")
+
+    def test_cutoff_is_shared_across_per_drive_run_folders(self):
+        """Every drive is triaged into its OWN output folder. A per-folder
+        cutoff would give each drive whatever date it happened to be
+        scanned on, moving the fastwork line from drive to drive."""
+        import json, time
+        with tempfile.TemporaryDirectory() as base:
+            ws = os.path.join(base, "ws")
+            outs = []
+            for i in (1, 2):
+                drive = os.path.join(base, f"drive{i}")
+                f = os.path.join(drive, "Client", f"Job{i}", "RAW", "c.mp4")
+                os.makedirs(os.path.dirname(f))
+                with open(f, "wb") as fh:
+                    fh.write(b"movie" * (100 + i))
+                os.utime(f, (time.time() - 3600,) * 2)
+                out = os.path.join(ws, f"RUN{i}")
+                common = ["--drive", drive, "--output-dir", out,
+                          "--log-dir", os.path.join(base, "logs")]
+                for cmd in ("inventory", "hash", "classify"):
+                    rc, _ = run_cli(cmd, *common)
+                    self.assertEqual(rc, 0)
+                outs.append(out)
+            cutoffs = []
+            for out in outs:
+                with open(os.path.join(out, "run-info.json"),
+                          encoding="utf-8") as fh:
+                    cutoffs.append(json.load(fh)["activity_cutoff_iso"])
+            self.assertEqual(cutoffs[0], cutoffs[1],
+                             "each run folder invented its own cutoff")
+            self.assertTrue(os.path.exists(
+                os.path.join(ws, "activity-cutoff.json")))
+
+    def test_cutoff_flag_rejects_an_impossible_date(self):
+        with tempfile.TemporaryDirectory() as base:
+            drive, path, out, common = self._setup(base)
+            with self.assertRaises(SystemExit) as ctx:
+                run_cli("classify", "--cutoff", "2026-13-40", *common)
+            self.assertIn("real date", str(ctx.exception))
+
+    def test_cutoff_flag_overrides_and_rerecords(self):
+        import json
+        with tempfile.TemporaryDirectory() as base:
+            drive, path, out, common = self._setup(base)
+            rc, _ = run_cli("classify", "--cutoff", "2000-01-01", *common)
+            self.assertEqual(rc, 0)
+            with open(os.path.join(out, "run-info.json"),
+                      encoding="utf-8") as fh:
+                info = json.load(fh)
+            self.assertEqual(info["activity_cutoff_iso"],
+                             "2000-01-01T00:00:00Z")
+
+
+class PlanTest(unittest.TestCase):
+    """The plan stage must prove safety or emit nothing: SHA256 on every
+    delete, collision-free destinations, and keeper-copied-before-delete
+    ordering."""
+
+    SHA_A = "aa" * 32
+    SHA_B = "bb" * 32
+    SHA_D = "dd" * 32
+
+    def _mkrun(self, ws, name, classify_rows, hash_rows=()):
+        from triage.util import CsvAppender
+        rd = os.path.join(ws, name)
+        os.makedirs(os.path.join(rd, "inventory"), exist_ok=True)
+        with CsvAppender(os.path.join(rd, "classify", "classify-X.csv"),
+                         CLASSIFY_COLUMNS) as w:
+            for r in classify_rows:
+                row = {c: "" for c in CLASSIFY_COLUMNS}
+                row.update(r)
+                row.setdefault("confidence", "high")
+                w.write(row)
+        if hash_rows:
+            with CsvAppender(os.path.join(rd, "hashes", "full-X.csv"),
+                             HASH_COLUMNS) as w:
+                for path, size, sha in hash_rows:
+                    w.write({"path": path, "size": size,
+                             "modified_utc": "2020-01-01T00:00:00Z",
+                             "prefix_sha256": sha, "full_sha256": sha,
+                             "error": ""})
+        return rd
+
+    def _log(self):
+        import logging
+        log = logging.getLogger("plantest")
+        log.addHandler(logging.NullHandler())
+        log.propagate = False
+        return log
+
+    def test_plan_orders_and_proves_everything(self):
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            keeper = r"F:\media\keep.mp4"
+            dupe = r"F:\backup\keep copy.mp4"
+            dref_dupe = r"F:\old\ddupe.bin"
+            self._mkrun(ws, "DriveOne", [
+                {"path": keeper, "size": "100", "drive": "F:\\",
+                 "class": "MEDIA", "nas_tier": "fastwork",
+                 "proposed_path": "Job\\01_RAW"},
+                {"path": dupe, "size": "100", "drive": "F:\\",
+                 "class": "DUPE_EXTERNAL", "dupe_of": keeper},
+                {"path": dref_dupe, "size": "50", "drive": "F:\\",
+                 "class": "EXACT_DUPE_OF_D", "dupe_of": r"D:\ref\x.bin"},
+                {"path": r"F:\junk\thumbs.db", "size": "10", "class": "JUNK"},
+                {"path": r"F:\odd\what.xyz", "size": "5",
+                 "class": "UNKNOWN"},
+            ], hash_rows=[(keeper, "100", self.SHA_A),
+                          (dupe, "100", self.SHA_A),
+                          (dref_dupe, "50", self.SHA_D)])
+            res = plan.build(ws, self._log())
+            rows = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
+            self.assertEqual(res["held"], 1)          # UNKNOWN not planned
+            by_path = {r["source_path"]: r for r in rows}
+            k, d = by_path[keeper], by_path[dupe]
+            # every copy precedes every delete
+            self.assertTrue(all(
+                int(a["seq"]) < int(b["seq"])
+                for a in rows if a["action"] == "copy"
+                for b in rows if b["action"] != "copy"))
+            # the delete names its keeper's copy row and both hashes match
+            self.assertEqual(d["depends_on"], k["seq"])
+            self.assertEqual(d["sha256"], self.SHA_A)
+            self.assertEqual(d["keeper_sha256"], self.SHA_A)
+            self.assertEqual(k["sha256"], self.SHA_A)
+            self.assertEqual(by_path[dref_dupe]["depends_on"], "D-REF")
+
+    def test_colliding_destinations_are_qualified_not_overwritten(self):
+        """Drives are scanned one at a time, so classification cannot know
+        another drive holds a same-named project. The clash surfaces here
+        and must be resolved - never by letting one file overwrite the
+        other."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            a = "F:\\one\\C0010.MP4"
+            b = "F:\\two\\C0010.MP4"
+            self._mkrun(ws, "DriveOne", [
+                {"path": a, "size": "10", "class": "MEDIA",
+                 "nas_tier": "fastwork", "proposed_path": "Job\\01_RAW"},
+            ], hash_rows=[(a, "10", self.SHA_A)])
+            self._mkrun(ws, "DriveTwo", [
+                {"path": b, "size": "20", "class": "MEDIA",
+                 "nas_tier": "fastwork", "proposed_path": "Job\\01_RAW"},
+            ], hash_rows=[(b, "20", self.SHA_B)])
+            res = plan.build(ws, self._log())
+            self.assertEqual(res["copies"], 2)
+            self.assertEqual(res["qualified"], 1)
+            rows = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
+            dests = sorted(r["dest_path"] for r in rows)
+            self.assertEqual(len(set(d.casefold() for d in dests)), 2,
+                             "two files still share one destination")
+            self.assertTrue(any(d.startswith("DriveTwo\\") for d in dests))
+
+    def test_identical_content_at_one_destination_is_merged(self):
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            a = "F:\\one\\same.mp4"
+            b = "F:\\two\\same.mp4"
+            self._mkrun(ws, "DriveOne", [
+                {"path": a, "size": "10", "class": "MEDIA",
+                 "nas_tier": "hdd-mirror",
+                 "proposed_path": "Media\\2020\\Job"},
+                {"path": b, "size": "10", "class": "MEDIA",
+                 "nas_tier": "hdd-mirror",
+                 "proposed_path": "Media\\2020\\Job"},
+            ], hash_rows=[(a, "10", self.SHA_A), (b, "10", self.SHA_A)])
+            res = plan.build(ws, self._log())
+            self.assertEqual(res["merged"], 1)
+            self.assertEqual(res["copies"], 1)
+
+    def test_hash_contradiction_halts_and_invalidates_a_previous_plan(self):
+        """Classification says duplicate, the recorded hashes disagree.
+        Something upstream is wrong, so no delete in this plan can be
+        trusted - and any earlier plan must not outlive it."""
+        from triage import plan
+        from triage.util import CsvAppender
+        with tempfile.TemporaryDirectory() as ws:
+            keeper = "F:\\media\\keep.mp4"
+            rd = self._mkrun(ws, "DriveOne", [
+                {"path": keeper, "size": "10", "class": "MEDIA",
+                 "nas_tier": "fastwork", "proposed_path": "Job\\01_RAW"},
+            ], hash_rows=[(keeper, "10", self.SHA_A)])
+            first = plan.build(ws, self._log())
+            self.assertEqual(first["copies"], 1)
+
+            dupe = "F:\\backup\\copy.mp4"
+            with CsvAppender(os.path.join(rd, "classify", "classify-X.csv"),
+                             CLASSIFY_COLUMNS) as w:
+                row = {c: "" for c in CLASSIFY_COLUMNS}
+                row.update({"path": dupe, "size": "10",
+                            "class": "DUPE_EXTERNAL", "dupe_of": keeper,
+                            "confidence": "high"})
+                w.write(row)
+            with CsvAppender(os.path.join(rd, "hashes", "full-X.csv"),
+                             HASH_COLUMNS) as w:
+                w.write({"path": dupe, "size": "10",
+                         "modified_utc": "2020-01-01T00:00:00Z",
+                         "prefix_sha256": self.SHA_B,
+                         "full_sha256": self.SHA_B, "error": ""})
+            with self.assertRaises(SystemExit) as ctx:
+                plan.build(ws, self._log())
+            self.assertIn("NO PLAN WRITTEN", str(ctx.exception))
+            self.assertEqual(list(read_csv_rows(
+                os.path.join(ws, "_plan", "plan.csv"), plan.PLAN_COLUMNS)),
+                [], "stale plan rows survived a violating build")
+            with open(os.path.join(ws, "_plan", "plan-report.md"),
+                      encoding="utf-8") as fh:
+                self.assertIn("NOT BUILT", fh.read())
+            with open(os.path.join(ws, "_plan", "plan-violations.csv"),
+                      encoding="utf-8") as fh:
+                self.assertIn("hash-contradiction", fh.read())
+
+    def test_unprovable_deletes_are_held_not_emitted(self):
+        """A delete that does not happen costs disk, never data. Holding
+        one must not refuse the whole fleet's plan."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            keeper = "F:\\media\\keep.mp4"
+            no_hash = "F:\\backup\\copy.mp4"
+            held_keeper = "F:\\odd\\keeper.xyz"
+            held_dupe = "F:\\backup\\odd copy.xyz"
+            junk = "F:\\junk\\big.tmp"
+            self._mkrun(ws, "DriveOne", [
+                {"path": keeper, "size": "10", "class": "MEDIA",
+                 "nas_tier": "fastwork", "proposed_path": "Job\\01_RAW"},
+                {"path": no_hash, "size": "10", "class": "DUPE_EXTERNAL",
+                 "dupe_of": keeper},
+                {"path": held_keeper, "size": "9", "class": "UNKNOWN"},
+                {"path": held_dupe, "size": "9", "class": "DUPE_EXTERNAL",
+                 "dupe_of": held_keeper},
+                {"path": junk, "size": "500", "class": "JUNK"},
+            ], hash_rows=[(keeper, "10", self.SHA_A),
+                          (held_keeper, "9", self.SHA_B),
+                          (held_dupe, "9", self.SHA_B)])
+            res = plan.build(ws, self._log())
+            self.assertEqual(res["copies"], 1)
+            self.assertEqual(res["deletes"], 0)
+            self.assertEqual(res["held_deletes"], 3)
+            with open(res["report"], encoding="utf-8") as fh:
+                report = fh.read()
+            self.assertIn("no measured SHA256", report)
+            self.assertIn("keeper is not scheduled", report)
+            self.assertIn("never deleted on its path alone", report)
+
+    def test_zero_byte_junk_is_deletable_without_a_hash(self):
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            self._mkrun(ws, "DriveOne", [
+                {"path": "F:\\junk\\empty.tmp", "size": "0",
+                 "class": "JUNK"},
+            ])
+            res = plan.build(ws, self._log())
+            rows = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["verify"], "zero-byte")
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
