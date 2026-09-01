@@ -116,23 +116,6 @@ byte total at render time, so they are **not stable identifiers**.
   edit in a session.
 - **C** — treat the list as advice and sort by hand.
 
-### D2 — Make the manifests safe to execute, or re-derive safety in the executor
-
-Manifests are proposals and nothing runs them — by design. But as shaped they
-cannot drive a safe copy-and-delete phase:
-
-- no SHA256 column, so copy-and-verify cannot check against what triage measured;
-- no destination-collision detection — two RECORDS files can be renamed into
-  the same folder under the same proposed name;
-- delete-candidate rows name a keeper but nothing verifies the keeper is
-  scheduled to be copied **first**.
-
-- **A (recommended)** — a `plan` stage emitting a verified, ordered,
-  collision-free plan carrying hashes. The execution session then becomes a
-  dumb, auditable replay.
-- **B** — let the executor derive safety itself. Loses the planning/execution
-  separation the read-only design exists to preserve.
-
 ### D4 — Make the cross-drive result actionable, or keep it as a signal
 
 Biggest number in the project, least usable: a CSV with no action column, no
