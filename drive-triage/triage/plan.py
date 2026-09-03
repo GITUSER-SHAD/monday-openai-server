@@ -345,14 +345,34 @@ def build(workspace, logger):
             f"plan was written. There is nothing here to execute.", "",
             "Every problem row is listed in `plan-violations.csv`.", ""]))
         by_kind = Counter(v["kind"] for v in violations)
+        # The remedy differs completely by kind, and naming the wrong one
+        # sends the user off to re-hash drives that were never the problem.
+        hints = {
+            "hash-contradiction":
+                "A hash contradiction means a file is classified as a "
+                "duplicate but the recorded SHA256s differ. Re-run "
+                "Re-Classify All Drives.bat; if it survives that, the two "
+                "hashes were taken at different times and the file changed "
+                "in between - re-hash that drive.",
+            "destination-collision":
+                "A destination collision means two DIFFERENT files are "
+                "aimed at one path, so a copy would overwrite. Open the CSV "
+                "and read source_path against other_path: they are usually "
+                "application or system files that should never have been "
+                "proposed as your own documents. Nothing needs re-hashing.",
+            "no-destination":
+                "A row with no destination is a classification that decided "
+                "to move a file but never said where. Re-run Re-Classify "
+                "All Drives.bat; if it survives, the row is named in the "
+                "CSV and needs a rule fix, not a re-scan.",
+        }
         raise SystemExit(
             f"NO PLAN WRITTEN: {len(violations):,} row(s) cannot be proven "
             f"safe - " +
             ", ".join(f"{k} {n:,}" for k, n in by_kind.most_common()) +
-            f". Every one is listed with its counterpart in {vio_csv}. "
-            f"An unprovable pair usually means a file was never hashed "
-            f"(its size was unique on its own drive): closing the coverage "
-            f"gap first - Close the Gap.bat - resolves those.")
+            f". Every one is listed with its counterpart in {vio_csv}.\n\n" +
+            "\n\n".join(hints[k] for k, _ in by_kind.most_common()
+                        if k in hints))
 
     # ---- emit -------------------------------------------------------------
     with CsvRewriter(plan_csv, PLAN_COLUMNS) as w:

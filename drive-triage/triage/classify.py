@@ -182,6 +182,7 @@ def detect_boxes(root, rows, logger):
             image_files.append((parts, row["ext"]))
 
     systemish_top = set()
+    systemish_under = {}       # parent dir -> {system folder names in it}
     for d in dirs_seen:
         base = d[-1].casefold()
         top = d[0]
@@ -189,6 +190,14 @@ def detect_boxes(root, rows, logger):
 
         if len(d) == 1 and top_low in SYSTEMISH_TOPDIRS:
             systemish_top.add(top)
+            continue
+        if base in SYSTEMISH_TOPDIRS:
+            # A machine backup is rarely dropped at the drive root: it
+            # arrives as F:\Local Disk\..., F:\C\..., F:\OldPC\C\....
+            # Requiring depth 1 meant every one of those escaped detection
+            # and its application payload was classified as the owner's own
+            # media and documents.
+            systemish_under.setdefault(d[:-1], set()).add(d[-1])
             continue
         if len(d) == 1 and BACKUPISH_NAME.search(top):
             box.add_box(f"top:{top_low}", top,
@@ -221,6 +230,30 @@ def detect_boxes(root, rows, logger):
         box.add_box(f"sys:{slug}", name,
                     "system-image layout at drive root: " +
                     ", ".join(sorted(systemish_top)), systemish_top)
+
+    # Everything above is settled before the nested system folders are
+    # considered, because a system folder INSIDE an already-detected box is
+    # not a new box - it is part of that one. Adding it anyway would win the
+    # longest-prefix match and split a backup into pieces under a second name.
+    box.finalize()
+    for parent, children in sorted(systemish_under.items()):
+        # Two or more of them side by side is a whole machine: box the
+        # folder holding them, so the backup stays one intact thing. A lone
+        # one is only evidence about ITSELF - boxing its parent could sweep
+        # in unrelated files that merely sit beside it.
+        if len(children) >= 2:
+            target, why = parent, (
+                f"system-image layout under {'/'.join(parent)}: " +
+                ", ".join(sorted(children)))
+        else:
+            child = sorted(children)[0]
+            target, why = parent + (child,), (
+                f"application/system folder {child!r} under "
+                f"{'/'.join(parent)}")
+        if box.lookup(list(target)):
+            continue
+        box.add_box("sys:" + "/".join(target).casefold(),
+                    " - ".join(target), why, {"/".join(target)})
 
     # standalone backup images: one box per image file
     for parts, ext in image_files:

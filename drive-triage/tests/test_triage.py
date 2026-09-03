@@ -737,6 +737,116 @@ class SystemBoxTest(unittest.TestCase):
                                             "old.doc"]))
             self.assertIsNone(box.lookup(["Media", "2020", "Shoot", "x.mp4"]))
 
+    def _boxes_for(self, base, rels):
+        import logging
+        g = os.path.join(base, "driveG")
+        for rel in rels:
+            fixtures._w(g, rel, b"x", fixtures.OLD)
+        rows = [{"path": os.path.join(dp, f),
+                 "ext": os.path.splitext(f)[1].lstrip(".").lower()}
+                for dp, _, fs in os.walk(g) for f in fs]
+        return detect_boxes(g, rows, logging.getLogger("t"))
+
+    def test_machine_backup_nested_one_level_is_boxed(self):
+        """A C: backup almost never lands at the drive root - it arrives as
+        F:\\Local Disk\\..., F:\\C\\.... Requiring depth 1 let every one of
+        those through, and its application payload was then classified as
+        the owner's own documents."""
+        with tempfile.TemporaryDirectory() as base:
+            box = self._boxes_for(base, [
+                "Local Disk/Windows/System32/kernel32.dll",
+                "Local Disk/Program Files (x86)/Adobe/Samples/Form.pdf",
+                "Local Disk/Users/jason/Documents/real.doc",
+                "Shoots/2020 Job/RAW/keep.mp4",
+            ])
+            for inside in (["Local Disk", "Program Files (x86)", "Adobe",
+                            "Samples", "Form.pdf"],
+                           ["Local Disk", "Windows", "System32",
+                            "kernel32.dll"],
+                           ["Local Disk", "Users", "jason", "Documents",
+                            "real.doc"]):
+                self.assertIsNotNone(box.lookup(inside),
+                                     f"{'/'.join(inside)} escaped the box")
+            self.assertIsNone(
+                box.lookup(["Shoots", "2020 Job", "RAW", "keep.mp4"]),
+                "real work outside the backup was swept into it")
+
+    def test_a_lone_system_folder_boxes_itself_not_its_parent(self):
+        """One system folder is evidence about ITSELF. Boxing its parent
+        would sweep in whatever happens to sit beside it."""
+        with tempfile.TemporaryDirectory() as base:
+            box = self._boxes_for(base, [
+                "Mixed Bag/Program Files (x86)/Adobe/Samples/Form.pdf",
+                "Mixed Bag/2019 Wedding/RAW/img.cr2",
+            ])
+            self.assertIsNotNone(box.lookup(
+                ["Mixed Bag", "Program Files (x86)", "Adobe", "Samples",
+                 "Form.pdf"]))
+            self.assertIsNone(
+                box.lookup(["Mixed Bag", "2019 Wedding", "RAW", "img.cr2"]),
+                "a lone system folder boxed its whole parent")
+
+    def test_a_system_folder_inside_an_existing_box_does_not_split_it(self):
+        """A backup-named folder is already one box. The Users/ inside it is
+        part of that box, not a second one - adding it would win the
+        longest-prefix match and rename half the backup."""
+        with tempfile.TemporaryDirectory() as base:
+            # ONE system folder inside it: the nested rule would target
+            # OldLaptopBackup/Users, a DEEPER prefix that wins the match and
+            # renames that half of the backup.
+            box = self._boxes_for(base, [
+                "OldLaptopBackup/Users/jason/Documents/letter.doc",
+                "OldLaptopBackup/Photos/2019/img.jpg",
+            ])
+            key = box.lookup(["OldLaptopBackup", "Users", "jason",
+                              "Documents", "letter.doc"])
+            self.assertIsNotNone(key)
+            self.assertEqual(box.boxes[key]["name"], "OldLaptopBackup",
+                             "an existing box was split under a new name")
+            self.assertEqual(
+                key, box.lookup(["OldLaptopBackup", "Photos", "2019",
+                                 "img.jpg"]),
+                "the two halves of one backup landed in different boxes")
+
+    def test_machine_backup_nested_two_levels_is_boxed(self):
+        with tempfile.TemporaryDirectory() as base:
+            box = self._boxes_for(base, [
+                "Backups/OldPC/C/Windows/win.ini",
+                "Backups/OldPC/C/ProgramData/app/data.bin",
+            ])
+            self.assertIsNotNone(box.lookup(
+                ["Backups", "OldPC", "C", "ProgramData", "app", "data.bin"]))
+
+    def test_nested_system_payload_is_not_proposed_as_a_record(self):
+        """The end-to-end consequence: Acrobat's own sample forms inside a
+        Program Files backup were classified as the owner's RECORDS and
+        aimed at Records\\_Inbox, where same-named samples collided."""
+        with tempfile.TemporaryDirectory() as base:
+            g = os.path.join(base, "driveG")
+            a = fixtures._w(
+                g, "Local Disk/Program Files (x86)/Adobe/Designer 9.0/FR/"
+                   "Samples/Forms/Purchase Order/Dynamic/Forms/"
+                   "Purchase Order.pdf", b"fr-sample", fixtures.OLD)
+            b = fixtures._w(
+                g, "Local Disk/Program Files (x86)/Adobe/Designer 9.0/DE/"
+                   "Samples/Forms/Purchase Order/Interactive/Forms/"
+                   "Purchase Order.pdf", b"de-sample", fixtures.OLD)
+            fixtures._w(g, "Local Disk/Windows/win.ini", b"ini", fixtures.OLD)
+            out = os.path.join(base, "out")
+            for cmd in ("inventory", "hash", "classify"):
+                rc, _ = run_cli(cmd, "--drive", g, "--output-dir", out,
+                                "--log-dir", os.path.join(base, "logs"))
+                self.assertEqual(rc, 0)
+            rows = rows_by_path(
+                os.path.join(out, "classify", "classify-driveG.csv"),
+                CLASSIFY_COLUMNS)
+            for p in (a, b):
+                self.assertEqual(rows[p]["class"], "ARCHIVE_BOX",
+                                 f"{p} was proposed as the owner's own file")
+            # Distinct native layout preserved => distinct destinations.
+            self.assertNotEqual(rows[a]["proposed_path"],
+                                rows[b]["proposed_path"])
+
 
 class UnitTest(unittest.TestCase):
     def test_date_parsing(self):

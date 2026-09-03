@@ -148,7 +148,21 @@ keeper election, no manifest.
 
 ## 5. Defect register
 
-**Fixed since:** classification could only be refreshed one drive at a time,
+**Fixed since:** the first real `plan` build halted on four
+destination collisions, all Adobe Acrobat sample forms inside a
+`Program Files (x86)` backup that had been classified as the owner's own
+RECORDS and aimed at one `Records\_Inbox` name. Root cause: system folders
+(`Windows`, `Program Files`, `ProgramData`, ...) were only recognised at the
+drive ROOT, and a machine backup essentially never lands there - it arrives
+as `F:\Local Disk\...` or `F:\C\...`. Those subtrees were never boxed and
+their application payload was classified as the owner's media and documents.
+Now recognised at any depth: two system folders side by side box the folder
+holding them (one intact backup), a lone one boxes only itself, and neither
+is added inside an already-detected box. The plan's violation summary also
+printed the remedy for the wrong violation kind - it told the user to
+re-hash drives to fix a destination collision.
+
+**Fixed before that:** classification could only be refreshed one drive at a time,
 which both re-derived a different activity cutoff per drive and left the
 fleet half-updated after `hashgaps` added hashes — `reclassify` now re-runs
 every run folder from the recorded CSVs against one cutoff, reloading the D
@@ -209,7 +223,7 @@ before the execution phase.
 ## 7. Codebase facts
 
 - `drive-triage/triage/` — ~4,000 lines, Python 3.9+, stdlib only, zero deps.
-- `drive-triage/tests/test_triage.py` — 117 tests, all pass, 1 skipped as root.
+- `drive-triage/tests/test_triage.py` — 122 tests, all pass, 1 skipped as root.
 - Eleven subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
   `reclassify`, `report`, `crossdrive`, `hashgaps`, `plan`, `all`. Flags are
   global.
