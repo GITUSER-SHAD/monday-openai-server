@@ -5,6 +5,7 @@
   python -m triage inventory  [--drive E:\\ | --drive \\\\server\\share] ...
   python -m triage hash
   python -m triage classify
+  python -m triage reclassify [--workspace C:\\DEV\\triage] [--run NAME]
   python -m triage report
   python -m triage all        (inventory -> hash -> classify -> report)
   python -m triage crossdrive [--workspace C:\\DEV\\triage]
@@ -24,8 +25,9 @@ from datetime import datetime, timedelta, timezone
 
 from . import __version__
 from .util import (
-    IS_WINDOWS, atomic_write_json, drive_slug, fmt_gb, guard_output_dirs,
-    is_unc, is_under, load_config, load_json, normalize_root, setup_logging,
+    INVENTORY_COLUMNS, IS_WINDOWS, atomic_write_json, drive_slug, fmt_gb,
+    guard_output_dirs, is_unc, is_under, load_config, load_json,
+    normalize_root, read_csv_rows, setup_logging,
 )
 from . import volumes as volumes_mod
 from .inventory import inventory_paths, run_inventory
@@ -323,6 +325,146 @@ def cmd_report(cfg, args, logger):
     return 0
 
 
+def _candidate_roots(path):
+    r"""Every prefix of a recorded absolute path that could be its scan root.
+
+    A drive letter or UNC share has exactly one answer ('F:\Foo\a' -> 'F:\',
+    r'\\host\share\a' -> r'\\host\share'). Anything else is walked up one
+    directory at a time, longest first, so a root that is a plain folder is
+    still recoverable.
+    """
+    p = path.strip().strip('"')
+    win = p.replace("/", "\\")
+    if is_unc(win):
+        parts = [q for q in win.lstrip("\\").split("\\") if q]
+        if len(parts) >= 2:
+            yield "\\\\" + parts[0] + "\\" + parts[1]
+        return
+    if re.match(r"^[A-Za-z]:[\\]", win):
+        yield win[0].upper() + ":\\"
+        return
+    cur = os.path.dirname(p)
+    while cur and cur != os.path.dirname(cur):
+        yield cur
+        cur = os.path.dirname(cur)
+
+
+def _root_of_run(run_dir, slug):
+    """Recover the scan root a run folder's inventory was built from.
+
+    Nothing else records it: eight of these targets were scanned at F:\\, so
+    the letter identifies nothing and the run folder name is free text. The
+    root is read back from the first path the inventory recorded, and only a
+    prefix that slugs to the same name the CSV is filed under is accepted -
+    otherwise one drive's rows would be classified as another's, so it
+    returns None and the caller reports the folder as not re-classified.
+    """
+    csv_path = os.path.join(run_dir, "inventory", f"inventory-{slug}.csv")
+    if not os.path.exists(csv_path):
+        return None
+    for row in read_csv_rows(csv_path, INVENTORY_COLUMNS):
+        if not (row["path"] or "").strip():
+            continue
+        for root in _candidate_roots(row["path"]):
+            if drive_slug(root) == slug:
+                return root
+        return None
+    return None
+
+
+def cmd_reclassify(cfg, args, logger):
+    """Re-run classify and report over every run folder in the workspace.
+
+    Classification reads only the recorded CSVs, so no drive is touched and
+    nothing needs to be plugged in. This exists because per-drive classify
+    output goes stale in two ways the user cannot see: whole-file hashes
+    added later (hashgaps) prove duplicates the earlier run had to call
+    unique, and a change to the rules moves the ground under every drive
+    already classified. Re-running one drive at a time would also give each
+    a different activity cutoff; here they all share the recorded one.
+    """
+    workspace = _resolve_workspace(cfg, args)
+    only = {o.casefold() for o in args.run} if args.run else None
+    runs = [(n, d) for n, d in crossdrive.find_runs(workspace)
+            if not only or n.casefold() in only]
+    skipped = []
+    if only:
+        for want in sorted(only):
+            if not any(n.casefold() == want for n, _ in runs):
+                skipped.append((want, "no run folder by this name in "
+                                      f"{workspace}"))
+    if not runs:
+        print(f"No run folder to re-classify in {workspace}.")
+        for name, why in skipped:
+            print(f"  {name}: {why}")
+        return 1
+
+    # Settled ONCE, from the first folder, then forced on every other: the
+    # per-folder call records to a shared file, but that write is allowed to
+    # fail (a read-only parent only warns), and two folders computing "today
+    # minus active_project_days" independently is exactly the drift this
+    # command exists to remove.
+    seed = {**cfg, "output_dir": runs[0][1]}
+    _set_activity_cutoff(seed, args, logger)
+    cutoff = seed["_activity_cutoff_iso"]
+
+    done = []
+    for name, run_dir in runs:
+        slugs = hashgaps.run_slugs(run_dir)
+        if not slugs:
+            skipped.append((name, "no inventory or hash CSV in this folder"))
+            continue
+        roots, unknown = [], []
+        for slug in slugs:
+            root = _root_of_run(run_dir, slug)
+            if root:
+                roots.append(root)
+            else:
+                unknown.append(slug)
+        if unknown:
+            skipped.append((name, "cannot recover the scan root for " +
+                            ", ".join(repr(s) for s in unknown) +
+                            " - the inventory is empty or its first row is "
+                            "not an absolute path"))
+        if not roots:
+            continue
+        run_cfg = {**cfg, "output_dir": run_dir, "scan_roots": list(roots),
+                   "_activity_cutoff_iso": cutoff}
+        guard_output_dirs({**run_cfg, "scan_roots": _approved_scope(cfg)})
+        try:
+            check_hash_marker(run_cfg, roots)
+        except SystemExit as exc:
+            skipped.append((name, " ".join(str(exc).split())))
+            continue
+        print(f"\n{name}: {', '.join(roots)}")
+        # Reloaded per run: run_classify drops D-reference entries that sit
+        # under the roots it is given, in place. Sharing one object across
+        # the fleet would shrink the reference drive by drive, so every run
+        # after the first would be classified against a different D.
+        stats = run_classify(run_cfg, roots, _dref(cfg, logger), logger)
+        _write_run_info(run_cfg, args, roots)
+        for root, counts in sorted(stats.items()):
+            print(f"  {root}: " + ", ".join(
+                f"{k}={v:,}" for k, v in sorted(counts.items())))
+        for out in run_reports(run_cfg, roots, logger):
+            print(f"  wrote {out}")
+        done.append(name)
+
+    print(f"\nRe-classified {len(done)} run folder(s) against cutoff "
+          f"{cutoff}.")
+    if not skipped:
+        print("Every run folder is now classified by the same rules and the "
+              "same cutoff. Next: Build the Plan.")
+        return 0
+    print("\nNOT re-classified:")
+    for name, why in skipped:
+        print(f"  {name}: {why}")
+    print("\nThose folders keep their PREVIOUS classification. A plan built "
+          "now would mix old answers with new ones, so sort these out (or "
+          "move them out of the workspace) and run this again.")
+    return 1
+
+
 def _approved_scope(cfg):
     """Scan roots the user has approved, best effort - used to make sure a
     write target is not on one of them."""
@@ -442,6 +584,7 @@ COMMANDS = {
     "inventory": cmd_inventory,
     "hash": cmd_hash,
     "classify": cmd_classify,
+    "reclassify": cmd_reclassify,
     "report": cmd_report,
     "crossdrive": cmd_crossdrive,
     "hashgaps": cmd_hashgaps,
@@ -479,8 +622,8 @@ def main(argv=None):
                     help="crossdrive/hashgaps: folder containing all run "
                          "folders (default: parent of output_dir)")
     ap.add_argument("--run", action="append", default=[],
-                    help="hashgaps: limit to these run folder NAMES "
-                         "(e.g. --run NAS_PHOTOS). Repeatable")
+                    help="hashgaps/reclassify: limit to these run folder "
+                         "NAMES (e.g. --run NAS_PHOTOS). Repeatable")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
@@ -499,7 +642,7 @@ def main(argv=None):
     # guard violation aborts before a single byte lands anywhere; `enumerate`
     # guards against an existing approved scope plus the Windows
     # system-drive rule for the output/log dirs themselves.
-    if args.command in ("crossdrive", "hashgaps", "plan"):
+    if args.command in ("crossdrive", "hashgaps", "plan", "reclassify"):
         # operate on completed run folders, not a scan target;
         # the workspace itself is guarded by _resolve_workspace
         guard_output_dirs({**cfg, "scan_roots": []})

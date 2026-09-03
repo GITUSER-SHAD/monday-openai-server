@@ -1,6 +1,6 @@
 # Project status — drive-triage
 
-Handoff brief for a fresh Claude/Cowork session. Written 2026-09-01 against
+Handoff brief for a fresh Claude/Cowork session. Written 2026-09-03 against
 branch `claude/external-drive-triage-b44sd8`.
 
 **Read `../../CLAUDE.md` before replying to the user.** The response-format
@@ -10,7 +10,14 @@ rules there are strict and were established after repeated correction.
 
 ## 1. Where the operation stands
 
-**Enumeration is complete.** All 15 run folders under `C:\DEV\triage\` are
+**Enumeration, gap closing and the cross-drive comparison are complete.**
+After `hashgaps` was run against every reachable target, the coverage gap
+fell from 140,041 unhashed files to **3,593**, and the cross-drive figure
+rose from 74,550 / 1,060.80 GB to **144,709 pieces of content on more than
+one drive, 3,977.36 GB reclaimable**. Five inventory rows record something
+that could not be read at all; their contents are in no comparison.
+
+All 15 run folders under `C:\DEV\triage\` are
 scanned and reported. Each target has its own folder because several
 physical drives share a drive letter — eight of the externals were all
 mounted as `F:`.
@@ -34,8 +41,10 @@ mounted as `F:`.
 
 ## 2. What the cross-drive comparison found
 
-Across all 15: **74,550 pieces of content on more than one drive,
-1,060.80 GB reclaimable.** Largest relationships:
+Across all 15, after the gap was closed: **144,709 pieces of content on more
+than one drive, 3,977.36 GB reclaimable.** The relationships below are from
+the earlier, pre-gap-closing pass and understate the totals; the current
+per-pair breakdown is in `_cross-drive/reports/cross-drive-duplicates.md`.
 
 | Pair | Shared |
 |---|---:|
@@ -67,9 +76,12 @@ Three caveats a reader must carry:
 size census, so a file whose size was unique on its own drive was never
 hashed — even if a twin sits on another drive.
 
-`hashgaps` (`Close the Gap.bat`) was built for exactly this and is **running
-now**. It hashes only the listed files and appends into the same per-run CSVs,
-so the next `crossdrive` picks them up with no re-scan.
+`hashgaps` (`Close the Gap.bat`) was built for exactly this and has now been
+**run against every reachable target**, one drive letter at a time. It hashes
+only the listed files and appends into the same per-run CSVs, so the
+following `crossdrive` picked them up with no re-scan. 3,593 files remain
+unhashed: chiefly ACL-locked Windows key material inside an old C: backup on
+`OLD-HDD_ARCHIVE_1`, which no re-run can read.
 
 Operational constraints the owner is working under:
 
@@ -83,10 +95,14 @@ Operational constraints the owner is working under:
 - Done when a run's summary shows nothing pending and nothing under NOT DONE.
   Then re-run `Compare All Drives.bat`.
 
-Drives with gaps: NAS_PHOTOS 38,184 · WD_PASSPORT_HDD_A 32,262 ·
-OLD-HDD_ARCHIVE_1 25,406 · NAS_fastwork 21,887 · NAS_DATA 14,369 ·
-D1-NVME 6,749 · D1-NVME-B 554 · T7-BEIGE-2TB 230 · Samsung_T7 142 ·
-NAS_VIDEO 132 · SAMSUNG_T5_1TB_A 126.
+All of those drives have now been through it. Two T7 Shields share an
+identical volume label AND an identical byte count, and the content-sample
+check told them apart correctly — it accepted `T7-BEIGE-2TB` and refused
+`Samsung_T7` on the same attachment.
+
+**Next in the sequence: `reclassify`, then `plan`.** The per-drive classify
+outputs still predate the 137,000 newly-hashed files, so the plan would
+otherwise be built from the old answer.
 
 ## 4. Open direction decisions
 
@@ -132,7 +148,18 @@ keeper election, no manifest.
 
 ## 5. Defect register
 
-**Fixed this session:** the crossdrive workspace now goes through the full
+**Fixed since:** classification could only be refreshed one drive at a time,
+which both re-derived a different activity cutoff per drive and left the
+fleet half-updated after `hashgaps` added hashes — `reclassify` now re-runs
+every run folder from the recorded CSVs against one cutoff, reloading the D
+reference per folder (`run_classify` drops reference paths under its roots
+in place, so a shared object would have shrunk the reference drive by drive).
+A run folder whose scan root cannot be recovered from its own inventory is
+named and left alone rather than guessed at. Also: `plan.py`'s `_basename`
+docstring raised a `SyntaxWarning` on every run, and `__pycache__` was
+tracked in git.
+
+**Fixed earlier:** the crossdrive workspace now goes through the full
 write guard (canonical path, volume identity, Windows system-drive rule)
 instead of a lexical check; the gap list states the real per-file reason and
 reads the full-hash CSVs, so a failed whole-file read is no longer reported as
@@ -182,9 +209,13 @@ before the execution phase.
 ## 7. Codebase facts
 
 - `drive-triage/triage/` — ~4,000 lines, Python 3.9+, stdlib only, zero deps.
-- `drive-triage/tests/test_triage.py` — 99 tests, all pass, 1 skipped as root.
-- Ten subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
-  `report`, `crossdrive`, `hashgaps`, `plan`, `all`. Flags are global.
-- User-facing entry points are four `.bat` launchers — `Triage a Drive.bat`,
-  `Compare All Drives.bat`, `Close the Gap.bat`, `Build the Plan.bat`. The
-  user runs the tool by double-clicking; assume no CLI familiarity.
+- `drive-triage/tests/test_triage.py` — 105 tests, all pass, 1 skipped as root.
+- Eleven subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
+  `reclassify`, `report`, `crossdrive`, `hashgaps`, `plan`, `all`. Flags are
+  global.
+- User-facing entry points are five `.bat` launchers — `Triage a Drive.bat`,
+  `Compare All Drives.bat`, `Close the Gap.bat`, `Re-Classify All
+  Drives.bat`, `Build the Plan.bat`. The user runs the tool by
+  double-clicking; assume no CLI familiarity.
+- Fleet order after the per-drive scans: `crossdrive` → `hashgaps` (repeat
+  until nothing is pending) → `crossdrive` → `reclassify` → `plan`.

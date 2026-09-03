@@ -5,6 +5,7 @@ Run from the drive-triage directory:
 """
 
 import contextlib
+import hashlib
 import io
 import os
 import shutil
@@ -18,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from triage import cli
 from triage.util import (
     CLASSIFY_COLUMNS, HASH_COLUMNS, INVENTORY_COLUMNS, MANIFEST_COLUMNS,
-    guard_output_dirs, read_csv_rows,
+    guard_output_dirs, load_json, read_csv_rows,
 )
 from triage.classify import (
     detect_boxes, parse_date_from_name, propose_record_name,
@@ -1783,6 +1784,245 @@ class PlanTest(unittest.TestCase):
             rows = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["verify"], "zero-byte")
+
+
+class ReclassifyTest(unittest.TestCase):
+    """Re-classifying the whole workspace must reach every run folder, give
+    them all ONE cutoff, keep each drive's rows with its own drive, and never
+    read the drives themselves."""
+
+    def _media(self, path, mtime=None):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(os.urandom(64) + path.encode("utf-8", "replace"))
+        if mtime is not None:
+            os.utime(path, (mtime, mtime))
+        return path
+
+    def _triage_one(self, ws, drive, name):
+        """Run the normal per-drive pipeline into its own run folder."""
+        out = os.path.join(ws, name)
+        rc, _ = run_cli("inventory", "--drive", drive, "--output-dir", out,
+                        "--log-dir", os.path.join(ws, "logs"))
+        self.assertEqual(rc, 0)
+        for cmd in ("hash", "classify"):
+            rc, _ = run_cli(cmd, "--drive", drive, "--output-dir", out,
+                            "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 0, f"{cmd} failed for {name}")
+        return out
+
+    def _snapshot(self, root):
+        seen = {}
+        for dirpath, _dirs, files in os.walk(root):
+            for f in files:
+                p = os.path.join(dirpath, f)
+                with open(p, "rb") as fh:
+                    seen[os.path.relpath(p, root)] = hashlib.sha256(
+                        fh.read()).hexdigest()
+        return seen
+
+    def _two_drives(self, base):
+        ws = os.path.join(base, "triage")
+        os.makedirs(ws, exist_ok=True)
+        a = os.path.join(base, "DriveAlpha")
+        b = os.path.join(base, "DriveBeta")
+        self._media(os.path.join(a, "Shoots", "Job A", "RAW", "a1.mp4"))
+        self._media(os.path.join(a, "Shoots", "Job A", "RAW", "a2.mp4"))
+        self._media(os.path.join(b, "Shoots", "Job B", "RAW", "b1.mp4"))
+        self._triage_one(ws, a, "RUN_ALPHA")
+        self._triage_one(ws, b, "RUN_BETA")
+        return ws, a, b
+
+    def test_reclassifies_every_run_folder_without_touching_drives(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, a, b = self._two_drives(base)
+            before_a, before_b = self._snapshot(a), self._snapshot(b)
+
+            rc, out = run_cli("reclassify", "--workspace", ws,
+                              "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                              "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 0, out)
+            self.assertIn("RUN_ALPHA", out)
+            self.assertIn("RUN_BETA", out)
+            self.assertNotIn("NOT re-classified", out)
+
+            self.assertEqual(self._snapshot(a), before_a,
+                             "reclassify modified a scanned drive")
+            self.assertEqual(self._snapshot(b), before_b,
+                             "reclassify modified a scanned drive")
+
+    def test_every_run_folder_shares_one_cutoff(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, _a, _b = self._two_drives(base)
+            rc, _ = run_cli("reclassify", "--workspace", ws,
+                            "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                            "--log-dir", os.path.join(ws, "logs"),
+                            "--cutoff", "2021-06-01")
+            self.assertEqual(rc, 0)
+            seen = set()
+            for name in ("RUN_ALPHA", "RUN_BETA"):
+                info = load_json(os.path.join(ws, name, "run-info.json"))
+                self.assertIsNotNone(info, f"{name} has no run-info.json")
+                seen.add(info["activity_cutoff_iso"])
+            self.assertEqual(seen, {"2021-06-01T00:00:00Z"},
+                             "drives were classified against different dates")
+
+    def test_each_run_keeps_only_its_own_drives_rows(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, a, b = self._two_drives(base)
+            rc, _ = run_cli("reclassify", "--workspace", ws,
+                            "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                            "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 0)
+            for name, mine, theirs in (("RUN_ALPHA", a, b),
+                                       ("RUN_BETA", b, a)):
+                slug = os.path.basename(mine)
+                csv_path = os.path.join(ws, name, "classify",
+                                        f"classify-{slug}.csv")
+                paths = [r["path"] for r in
+                         read_csv_rows(csv_path, CLASSIFY_COLUMNS)]
+                self.assertTrue(paths, f"{name} classified nothing")
+                self.assertTrue(all(p.startswith(mine) for p in paths))
+                self.assertFalse(any(p.startswith(theirs) for p in paths))
+
+    def test_run_folder_with_an_unrecoverable_root_is_named_not_guessed(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, _a, _b = self._two_drives(base)
+            # An inventory whose rows no longer say which drive they came
+            # from: the folder must be reported, never classified anyway.
+            broken = os.path.join(ws, "RUN_BETA", "inventory")
+            csv_path = [os.path.join(broken, f) for f in os.listdir(broken)
+                        if f.endswith(".csv")][0]
+            with open(csv_path, "w", encoding="utf-8", newline="") as fh:
+                fh.write(",".join(INVENTORY_COLUMNS) + "\n")
+                fh.write("not-an-absolute-path,1,,,mp4,\n")
+
+            rc, out = run_cli("reclassify", "--workspace", ws,
+                              "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                              "--log-dir", os.path.join(ws, "logs"))
+            # A half-updated fleet must NOT report success: a plan built now
+            # would mix RUN_ALPHA's new answers with RUN_BETA's old ones.
+            self.assertEqual(rc, 1)
+            self.assertIn("NOT re-classified", out)
+            self.assertIn("RUN_BETA", out.split("NOT re-classified")[1])
+            self.assertIn("Re-classified 1 run folder", out)
+
+    def test_only_flag_limits_to_named_runs(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, _a, _b = self._two_drives(base)
+            beta_info = os.path.join(ws, "RUN_BETA", "run-info.json")
+            alpha_info = os.path.join(ws, "RUN_ALPHA", "run-info.json")
+            before = load_json(beta_info)          # written by the first pass
+            self.assertIsNotNone(before)
+            rc, out = run_cli("reclassify", "--workspace", ws,
+                              "--run", "RUN_ALPHA",
+                              "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                              "--log-dir", os.path.join(ws, "logs"),
+                              "--cutoff", "2021-06-01")
+            self.assertEqual(rc, 0, out)
+            self.assertIn("RUN_ALPHA", out)
+            self.assertNotIn("RUN_BETA", out)
+            self.assertEqual(load_json(alpha_info)["activity_cutoff_iso"],
+                             "2021-06-01T00:00:00Z")
+            self.assertEqual(load_json(beta_info), before,
+                             "--run did not limit the fleet")
+
+
+    def test_empty_workspace_is_reported_not_silently_successful(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws = os.path.join(base, "triage")
+            os.makedirs(os.path.join(ws, "RUN_ALPHA"), exist_ok=True)
+            rc, out = run_cli("reclassify", "--workspace", ws,
+                              "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                              "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 1)
+            self.assertIn("No run folder", out)
+
+    def test_a_folder_with_no_csvs_is_named_not_skipped_silently(self):
+        with tempfile.TemporaryDirectory() as base:
+            ws, _a, _b = self._two_drives(base)
+            # An inventory FOLDER with no CSVs in it: find_runs yields it,
+            # run_slugs finds nothing. It must be named, never passed over.
+            os.makedirs(os.path.join(ws, "RUN_EMPTY", "inventory"))
+            rc, out = run_cli("reclassify", "--workspace", ws,
+                              "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                              "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 1)
+            self.assertIn("RUN_EMPTY", out.split("NOT re-classified")[1])
+
+    def test_cutoff_is_settled_once_for_the_whole_fleet(self):
+        """Every folder must be handed the SAME cutoff object, not each
+        recompute it - two folders computing 'today minus N' independently
+        is the drift this command exists to remove."""
+        with tempfile.TemporaryDirectory() as base:
+            ws, _a, _b = self._two_drives(base)
+            seen = []
+            real = cli._set_activity_cutoff
+
+            def spy(cfg, args, logger):
+                real(cfg, args, logger)
+                seen.append(cfg["_activity_cutoff_iso"])
+
+            cli._set_activity_cutoff = spy
+            try:
+                rc, _ = run_cli("reclassify", "--workspace", ws,
+                                "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                                "--log-dir", os.path.join(ws, "logs"))
+            finally:
+                cli._set_activity_cutoff = real
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(seen), 1,
+                             "the cutoff was derived more than once")
+            infos = [load_json(os.path.join(ws, n, "run-info.json"))
+                     ["activity_cutoff_iso"]
+                     for n in ("RUN_ALPHA", "RUN_BETA")]
+            self.assertEqual(set(infos), {seen[0]})
+
+    def test_d_reference_is_not_consumed_by_the_first_run(self):
+        """run_classify drops D-reference rows under the roots it is given,
+        in place. If one object were shared across the fleet, every drive
+        after the first would be judged against a shrunken D."""
+        with tempfile.TemporaryDirectory() as base:
+            ws = os.path.join(base, "triage")
+            os.makedirs(ws, exist_ok=True)
+            shared = os.urandom(96) + b"lives-on-D-and-both-drives" * 400
+            dref_csv = os.path.join(base, "dref.csv")
+            a = os.path.join(base, "DriveAlpha")
+            b = os.path.join(base, "DriveBeta")
+            for drive in (a, b):
+                p = os.path.join(drive, "stuff", "shared.bin")
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                with open(p, "wb") as fh:
+                    fh.write(shared)
+            sha = hashlib.sha256(shared).hexdigest()
+            with open(dref_csv, "w", encoding="utf-8", newline="") as fh:
+                fh.write("path,size,sha256\n")
+                fh.write(f"D:\\ref\\shared.bin,{len(shared)},{sha}\n")
+            for drive, name in ((a, "RUN_ALPHA"), (b, "RUN_BETA")):
+                out = os.path.join(ws, name)
+                for cmd in ("inventory", "hash", "classify"):
+                    rc, _ = run_cli(cmd, "--drive", drive,
+                                    "--output-dir", out,
+                                    "--d-reference", dref_csv,
+                                    "--log-dir", os.path.join(ws, "logs"))
+                    self.assertEqual(rc, 0)
+
+            rc, _ = run_cli("reclassify", "--workspace", ws,
+                            "--d-reference", dref_csv,
+                            "--output-dir", os.path.join(ws, "RUN_ALPHA"),
+                            "--log-dir", os.path.join(ws, "logs"))
+            self.assertEqual(rc, 0)
+            # BOTH drives must still see the file as a copy of D's.
+            for drive, name in ((a, "RUN_ALPHA"), (b, "RUN_BETA")):
+                slug = os.path.basename(drive)
+                rows = rows_by_path(
+                    os.path.join(ws, name, "classify", f"classify-{slug}.csv"),
+                    CLASSIFY_COLUMNS)
+                row = rows[os.path.join(drive, "stuff", "shared.bin")]
+                self.assertEqual(
+                    row["class"], "EXACT_DUPE_OF_D",
+                    f"{name} lost the D reference (got {row['class']})")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

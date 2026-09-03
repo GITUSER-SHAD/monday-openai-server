@@ -43,6 +43,10 @@ python -m triage classify  --config triage-config.json
 python -m triage report    --config triage-config.json
 ```
 
+With more than one drive, each gets its own run folder and the fleet-wide
+stages follow: `crossdrive` → `hashgaps` (repeat until it reports nothing
+pending) → `crossdrive` again → `reclassify` → `plan`.
+
 Prioritize the largest drive by running it alone first:
 
 ```bat
@@ -136,6 +140,30 @@ this exists because recording one drive's bytes under another drive's paths
 would fabricate a duplicate — the one error that could later justify
 deleting the only copy of something.
 
+## Re-classifying the fleet
+
+```bat
+python -m triage reclassify --workspace C:\DEV\triage   rem Re-Classify All Drives.bat
+```
+
+Per-drive classification goes stale in two ways nobody can see by looking at
+it: whole-file hashes added later by `hashgaps` prove duplicates the earlier
+run had to call unique, and a change to the rules moves the ground under
+every drive already classified. `reclassify` re-runs `classify` and `report`
+over every run folder in the workspace from the recorded CSVs alone — no
+drive is read and nothing needs to be plugged in.
+
+Doing it one drive at a time would give each its own activity cutoff; here
+they all share the recorded one, so the fastwork/hdd-mirror line stays put.
+
+Nothing records which target a run folder was built from — eight of this
+fleet mounted at `F:\` and the folder name is free text — so the scan root
+is read back from the first path in the folder's own inventory, and only a
+prefix that slugs to the same name the CSV is filed under is accepted. A
+folder whose root cannot be recovered that way is **named in the summary and
+left alone**, keeping its old classification, rather than guessed at. Build
+the plan only once that list is empty.
+
 ## The plan stage
 
 ```bat
@@ -214,10 +242,12 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-99 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+105 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),
+fleet-wide re-classification (one shared cutoff, no cross-run
+contamination of the D reference, an unrecoverable root named not guessed),
 and the security properties (no network imports, no delete/rename calls,
 guard bypasses).
 
