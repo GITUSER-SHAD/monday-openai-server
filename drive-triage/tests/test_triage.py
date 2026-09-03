@@ -1884,6 +1884,158 @@ class PlanTest(unittest.TestCase):
             with open(res["report"], encoding="utf-8") as fh:
                 self.assertIn("source_volume", fh.read())
 
+    def test_two_files_on_ONE_drive_colliding_are_separated_not_fatal(self):
+        """Qualifying by source drive is a no-op when both files came from
+        the SAME drive - the prefix is identical. The real fleet hit exactly
+        this: four Acrobat sample forms on one archive drive, all aimed at
+        one Records name."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            rows, hashes = [], []
+            for i in range(4):
+                src = f"F:\\Prog\\L{i}\\Purchase Order.pdf"
+                rows.append({"path": src, "size": "10", "drive": "F:\\",
+                             "class": "RECORDS", "nas_tier": "hdd-mirror",
+                             "proposed_path": "Records\\_Inbox",
+                             "proposed_name": "2010-10-09  Purchase Order.pdf"})
+                hashes.append((src, "10", f"{i:02x}" * 32))
+            self._mkrun(ws, "OneDrive", rows, hash_rows=hashes)
+            res = plan.build(ws, self._log())      # must not raise
+            got = list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS))
+            self.assertEqual(len(got), 4)
+            keys = {plan.dest_key(r["nas_tier"], r["dest_path"]) for r in got}
+            self.assertEqual(len(keys), 4, "two rows still share a path")
+
+    def test_windows_equivalent_destinations_collide(self):
+        """A trailing dot or space, or a doubled separator, names the same
+        Windows file. Comparing raw strings would call these collision-free
+        and let a copy overwrite."""
+        from triage import plan
+        self.assertEqual(plan.dest_key("t", "A\\B.pdf"),
+                         plan.dest_key("t", "A\\\\B.pdf"))
+        self.assertEqual(plan.dest_key("t", "A\\B.pdf"),
+                         plan.dest_key("t", "A/B.pdf"))
+        self.assertEqual(plan.dest_key("t", "A\\B.pdf"),
+                         plan.dest_key("t", "A \\B.pdf."))
+
+    def test_a_destination_escaping_the_tier_root_is_refused(self):
+        from triage import plan
+        for bad in ("..\\out.pdf", "A\\..\\..\\out.pdf", "D:\\ref\\x.bin",
+                    "\\\\nas\\share\\x.bin", "A\\CON", "A\\NUL.txt"):
+            self.assertIsNotNone(plan.dest_problem(bad), f"{bad} accepted")
+        for ok in ("A\\B.pdf", "Records\\_Inbox\\2010 x.pdf", "loose.mp4"):
+            self.assertIsNone(plan.dest_problem(ok), f"{ok} refused")
+
+    def test_unsafe_destination_halts_the_build(self):
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            self._mkrun(ws, "DriveOne", [
+                {"path": "F:\\a\\x.pdf", "size": "10", "drive": "F:\\",
+                 "class": "RECORDS", "nas_tier": "hdd-mirror",
+                 "proposed_path": "Records\\..\\..\\escape"},
+            ])
+            with self.assertRaises(SystemExit):
+                plan.build(ws, self._log())
+            vio = list(read_csv_rows(
+                os.path.join(ws, plan.PLAN_DIR, "plan-violations.csv"),
+                plan.VIOLATION_COLUMNS))
+            self.assertEqual([v["kind"] for v in vio], ["unsafe-destination"])
+
+    def test_previous_plan_is_dead_before_the_build_can_fail(self):
+        """The old plan described inputs that no longer hold. It must not
+        survive an abort - a locked CSV, a Ctrl-C, a bad header - all of
+        which report failure while leaving something executable on disk."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            self._mkrun(ws, "DriveOne", [
+                {"path": "F:\\m\\a.mp4", "size": "10", "drive": "F:\\",
+                 "class": "MEDIA", "nas_tier": "fastwork",
+                 "proposed_path": "Job\\01_RAW"},
+            ])
+            res = plan.build(ws, self._log())
+            self.assertTrue(list(read_csv_rows(res["plan_csv"],
+                                               plan.PLAN_COLUMNS)))
+            # Now make the build die AFTER it starts, the way a corrupt CSV
+            # or a locked file would.
+            boom = os.path.join(ws, "DriveOne", "classify", "classify-X.csv")
+            with open(boom, "w", encoding="utf-8", newline="") as fh:
+                fh.write("not,the,expected,header\n")
+            with self.assertRaises(SystemExit):
+                plan.build(ws, self._log())
+            self.assertEqual(
+                list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS)), [],
+                "a disproven plan survived a failed build")
+
+    def test_mixed_cutoffs_across_run_folders_halt_the_build(self):
+        """reclassify refuses to call a half-updated fleet a success; the
+        plan must not quietly build one anyway."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            for name, iso in (("DriveOne", "2020-01-01T00:00:00Z"),
+                              ("DriveTwo", "2024-01-01T00:00:00Z")):
+                rd = self._mkrun(ws, name, [
+                    {"path": f"F:\\{name}\\a.mp4", "size": "10",
+                     "drive": "F:\\", "class": "MEDIA",
+                     "nas_tier": "fastwork", "proposed_path": name}])
+                with open(os.path.join(rd, "run-info.json"), "w",
+                          encoding="utf-8") as fh:
+                    json.dump({"activity_cutoff_iso": iso,
+                               "tool_version": "1.0"}, fh)
+            with self.assertRaises(SystemExit) as ctx:
+                plan.build(ws, self._log())
+            self.assertIn("mixed-provenance", str(ctx.exception))
+
+    def test_dupe_of_d_without_a_named_keeper_is_held(self):
+        """keeper_sha256 on these rows is what the executor must FIND on D:,
+        not a second measurement. With no keeper path there is nothing to
+        find, so the row must not be emitted."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            src = "F:\\old\\x.bin"
+            self._mkrun(ws, "DriveOne", [
+                {"path": src, "size": "50", "drive": "F:\\",
+                 "class": "EXACT_DUPE_OF_D", "dupe_of": ""},
+            ], hash_rows=[(src, "50", self.SHA_D)])
+            res = plan.build(ws, self._log())
+            self.assertEqual(
+                list(read_csv_rows(res["plan_csv"], plan.PLAN_COLUMNS)), [])
+            held = list(read_csv_rows(
+                os.path.join(ws, plan.PLAN_DIR, "plan-held.csv"),
+                plan.HELD_COLUMNS))
+            self.assertEqual([h["source_path"] for h in held], [src])
+            self.assertIn("keeper", held[0]["reason"])
+
+    def test_every_held_delete_is_named_not_just_counted(self):
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            junk = "F:\\junk\\big.tmp"
+            self._mkrun(ws, "DriveOne", [
+                {"path": junk, "size": "999", "class": "JUNK"},
+            ])
+            plan.build(ws, self._log())
+            held = list(read_csv_rows(
+                os.path.join(ws, plan.PLAN_DIR, "plan-held.csv"),
+                plan.HELD_COLUMNS))
+            self.assertEqual([h["source_path"] for h in held], [junk])
+            self.assertEqual(held[0]["class"], "JUNK")
+            self.assertTrue(held[0]["reason"])
+
+    def test_plan_id_changes_when_the_plan_changes(self):
+        from triage import plan
+        def build_with(size):
+            ws = tempfile.mkdtemp()
+            self._mkrun(ws, "DriveOne", [
+                {"path": "F:\\m\\a.mp4", "size": size, "drive": "F:\\",
+                 "class": "MEDIA", "nas_tier": "fastwork",
+                 "proposed_path": "Job"}])
+            plan.build(ws, self._log())
+            return load_json(os.path.join(ws, plan.PLAN_DIR,
+                                          "plan-info.json"))["plan_id"]
+        a, b = build_with("10"), build_with("10")
+        self.assertEqual(a, b, "plan id is not deterministic")
+        self.assertNotEqual(a, build_with("11"),
+                            "plan id did not change with the plan")
+
     def test_zero_byte_junk_is_deletable_without_a_hash(self):
         from triage import plan
         with tempfile.TemporaryDirectory() as ws:

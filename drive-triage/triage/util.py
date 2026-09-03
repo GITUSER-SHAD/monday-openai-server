@@ -471,6 +471,18 @@ def fmt_gb(nbytes):
 
 
 def write_text(path, text):
+    """Replace a text file atomically.
+
+    Truncate-then-write would leave a half-written file if the process died
+    mid-write, and these files are read as authority: plan-report.md carries
+    the executor's entire delete-verification contract at the END of the
+    string, so a partial write loses exactly the rules that matter, and the
+    "NOT BUILT" replacement of a stale report has to be all-or-nothing.
+    """
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as fh:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
