@@ -126,7 +126,7 @@ def _iter_classified(run_dir):
 
 
 def _basename(path):
-    """The final component of a Windows-style path, regardless of the OS
+    r"""The final component of a Windows-style path, regardless of the OS
     this runs on - os.path.basename would keep the whole F:\ path intact
     on a non-Windows machine and quietly disable collision detection."""
     return path.replace("/", "\\").rsplit("\\", 1)[-1]
