@@ -161,8 +161,12 @@ fleet mounted at `F:\` and the folder name is free text — so the scan root
 is read back from the first path in the folder's own inventory, and only a
 prefix that slugs to the same name the CSV is filed under is accepted. A
 folder whose root cannot be recovered that way is **named in the summary and
-left alone**, keeping its old classification, rather than guessed at. Build
-the plan only once that list is empty.
+left alone as a whole**, keeping its old classification, rather than guessed
+at; so is one whose classification fails partway, and the folders behind it
+are still attempted. A drive that genuinely held no files is not a failure
+and is reported separately. Anything short of every folder re-classified —
+including a deliberate `--run` subset — exits non-zero, because a plan built
+from a half-updated fleet would mix old answers with new ones.
 
 ## The plan stage
 
@@ -242,12 +246,14 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-105 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+117 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),
-fleet-wide re-classification (one shared cutoff, no cross-run
-contamination of the D reference, an unrecoverable root named not guessed),
+fleet-wide re-classification (the work is proven to be redone, one shared
+cutoff, no cross-run contamination of the D reference, two run folders under
+one slug kept apart, an unrecoverable root named not guessed, one bad folder
+not abandoning the rest),
 and the security properties (no network imports, no delete/rename calls,
 guard bypasses).
 

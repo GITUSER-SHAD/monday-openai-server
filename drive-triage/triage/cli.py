@@ -326,12 +326,15 @@ def cmd_report(cfg, args, logger):
 
 
 def _candidate_roots(path):
-    r"""Every prefix of a recorded absolute path that could be its scan root.
+    r"""Every prefix of a recorded absolute path that could be its scan root,
+    SHALLOWEST first.
 
     A drive letter or UNC share has exactly one answer ('F:\Foo\a' -> 'F:\',
-    r'\\host\share\a' -> r'\\host\share'). Anything else is walked up one
-    directory at a time, longest first, so a root that is a plain folder is
-    still recoverable.
+    r'\\host\share\a' -> r'\\host\share') - neither can be scanned above
+    itself. Anything else is walked up to the filesystem root and returned
+    outermost-first, because two nested directories can share a basename and
+    therefore a slug, and the outer one is the safer reading: it still
+    contains every recorded row.
     """
     p = path.strip().strip('"')
     win = p.replace("/", "\\")
@@ -343,33 +346,92 @@ def _candidate_roots(path):
     if re.match(r"^[A-Za-z]:[\\]", win):
         yield win[0].upper() + ":\\"
         return
-    cur = os.path.dirname(p)
+    up, cur = [], os.path.dirname(p)
     while cur and cur != os.path.dirname(cur):
-        yield cur
+        up.append(cur)
         cur = os.path.dirname(cur)
+    for root in reversed(up):
+        yield root
 
 
 def _root_of_run(run_dir, slug):
     """Recover the scan root a run folder's inventory was built from.
 
-    Nothing else records it: eight of these targets were scanned at F:\\, so
-    the letter identifies nothing and the run folder name is free text. The
-    root is read back from the first path the inventory recorded, and only a
-    prefix that slugs to the same name the CSV is filed under is accepted -
-    otherwise one drive's rows would be classified as another's, so it
-    returns None and the caller reports the folder as not re-classified.
+    Returns (root, status): ("F:\\", "ok"), (None, "empty") for a folder
+    whose drive genuinely held no files, or (None, reason) when it cannot be
+    established.
+
+    Nothing outside the run folder records the root: eight of this fleet's
+    targets were all mounted at F:\\, so the letter identifies nothing, and
+    the folder name is free text. Three sources are tried, strongest first:
+
+    1. run-info.json, written by classify itself - authoritative when present.
+    2. Otherwise the paths the inventory recorded. `drive_slug` is not
+       injective (nested folders sharing a basename slug alike), so a slug
+       match alone can be satisfied by the wrong prefix. The candidate must
+       also sit at or above the deepest directory common to EVERY recorded
+       row, which rules the too-deep readings out.
+    3. Whatever survives is then checked against every recorded row: one row
+       outside it means the wrong root, and it refuses.
+
+    A scan root deeper than a drive letter or a UNC share cannot be told
+    apart from its drive or share by paths alone, so it is recovered as the
+    drive or share. This fleet has no such root, and once a folder carries a
+    run-info.json the question does not arise again.
     """
     csv_path = os.path.join(run_dir, "inventory", f"inventory-{slug}.csv")
     if not os.path.exists(csv_path):
-        return None
-    for row in read_csv_rows(csv_path, INVENTORY_COLUMNS):
-        if not (row["path"] or "").strip():
+        return None, f"no inventory-{slug}.csv in this folder"
+
+    paths = [(r["path"] or "").strip()
+             for r in read_csv_rows(csv_path, INVENTORY_COLUMNS)
+             if (r["path"] or "").strip()]
+    if not paths:
+        return None, "empty"
+
+    recorded = (load_json(os.path.join(run_dir, "run-info.json")) or {}).get(
+        "scan_roots") or []
+    for root in recorded:
+        if drive_slug(root) == slug and _covers(root, paths):
+            return root, "ok"
+
+    common = _common_dir(paths)
+    for root in _candidate_roots(paths[0]):
+        if drive_slug(root) != slug:
             continue
-        for root in _candidate_roots(row["path"]):
-            if drive_slug(root) == slug:
-                return root
-        return None
-    return None
+        if not (is_under(common, root) or _same_path(common, root)):
+            continue          # a reading deeper than the rows allow
+        if not _covers(root, paths):
+            break             # rows outside it: this folder mixes drives
+        return root, "ok"
+    return None, ("its recorded paths do not agree on a scan root that "
+                  f"matches '{slug}'")
+
+
+def _same_path(a, b):
+    n = (lambda s: s.rstrip("\\/").casefold() if IS_WINDOWS
+         else s.rstrip("/"))
+    return n(a) == n(b)
+
+
+def _covers(root, paths):
+    return all(is_under(p, root) for p in paths)
+
+
+def _common_dir(paths):
+    """Deepest directory containing every recorded path."""
+    sep = "\\" if any("\\" in p for p in paths) else "/"
+    split = [p.replace("/", sep).split(sep) for p in paths]
+    common = split[0][:-1]
+    for parts in split[1:]:
+        keep = 0
+        for a, b in zip(common, parts[:-1]):
+            same = a.casefold() == b.casefold() if IS_WINDOWS else a == b
+            if not same:
+                break
+            keep += 1
+        common = common[:keep]
+    return sep.join(common) or sep
 
 
 def cmd_reclassify(cfg, args, logger):
@@ -389,80 +451,128 @@ def cmd_reclassify(cfg, args, logger):
             if not only or n.casefold() in only]
     skipped = []
     if only:
-        for want in sorted(only):
-            if not any(n.casefold() == want for n, _ in runs):
+        for want in args.run:                 # echoed as the user typed it
+            if not any(n.casefold() == want.casefold() for n, _ in runs):
                 skipped.append((want, "no run folder by this name in "
                                       f"{workspace}"))
     if not runs:
         print(f"No run folder to re-classify in {workspace}.")
+        print("A run folder is a subfolder holding an 'inventory' directory. "
+              "If this is the wrong place, point --workspace at the folder "
+              "that holds the per-drive folders (normally C:\\DEV\\triage).")
         for name, why in skipped:
             print(f"  {name}: {why}")
         return 1
 
-    # Settled ONCE, from the first folder, then forced on every other: the
-    # per-folder call records to a shared file, but that write is allowed to
-    # fail (a read-only parent only warns), and two folders computing "today
-    # minus active_project_days" independently is exactly the drift this
-    # command exists to remove.
+    # Settled ONCE, then forced on every folder: the per-folder call records
+    # to a shared file, but that write is allowed to fail (a read-only parent
+    # only warns), and two folders computing "today minus
+    # active_project_days" independently is exactly the drift this command
+    # exists to remove.
     seed = {**cfg, "output_dir": runs[0][1]}
     _set_activity_cutoff(seed, args, logger)
     cutoff = seed["_activity_cutoff_iso"]
+    if not args.cutoff:
+        # With no shared file yet, the seed fell back to one folder's own
+        # run-info.json. Say so when the others disagree, instead of moving
+        # a drive between tiers on the strength of alphabetical order.
+        others = sorted({
+            (load_json(os.path.join(d, "run-info.json")) or {}).get(
+                "activity_cutoff_iso")
+            for _n, d in runs} - {None, "", cutoff})
+        if others:
+            print(f"Note: these folders were last classified against "
+                  f"{', '.join(others)}; all of them now move to {cutoff}. "
+                  f"Pass --cutoff YYYY-MM-DD to choose a different date for "
+                  f"the whole fleet.")
 
-    done = []
+    done, empty = [], []
     for name, run_dir in runs:
         slugs = hashgaps.run_slugs(run_dir)
         if not slugs:
             skipped.append((name, "no inventory or hash CSV in this folder"))
             continue
-        roots, unknown = [], []
+        roots, blank, unknown = [], [], []
         for slug in slugs:
-            root = _root_of_run(run_dir, slug)
+            root, why = _root_of_run(run_dir, slug)
             if root:
                 roots.append(root)
+            elif why == "empty":
+                blank.append(slug)
             else:
-                unknown.append(slug)
+                unknown.append(f"{slug}: {why}")
+        # A folder is re-classified whole or not at all. Doing the slugs that
+        # resolved would leave the rest silently stale behind a rewritten
+        # run-info.json claiming the folder was done.
         if unknown:
-            skipped.append((name, "cannot recover the scan root for " +
-                            ", ".join(repr(s) for s in unknown) +
-                            " - the inventory is empty or its first row is "
-                            "not an absolute path"))
+            why = "cannot recover the scan root for " + "; ".join(unknown)
+            if roots or blank:
+                why += (f" - the other {len(roots) + len(blank)} drive(s) in "
+                        f"this folder were left alone too, so nothing here "
+                        f"is half-updated")
+            skipped.append((name, why))
+            continue
         if not roots:
+            empty.append(name)          # every drive here held no files
             continue
         run_cfg = {**cfg, "output_dir": run_dir, "scan_roots": list(roots),
                    "_activity_cutoff_iso": cutoff}
-        guard_output_dirs({**run_cfg, "scan_roots": _approved_scope(cfg)})
+        # Both the roots this folder came from and any approved scope: the
+        # guard must know every drive it is forbidden to write onto, and
+        # scope.json is frequently absent when targets were passed as --drive.
+        guard_output_dirs({**run_cfg,
+                           "scan_roots": list(roots) + _approved_scope(cfg)})
         try:
             check_hash_marker(run_cfg, roots)
+            print(f"\n{name}: {', '.join(roots)}")
+            # Reloaded per run: run_classify drops D-reference entries that
+            # sit under the roots it is given, in place. Sharing one object
+            # across the fleet would shrink the reference drive by drive, so
+            # every run after the first is classified against a different D.
+            stats = run_classify(run_cfg, roots, _dref(cfg, logger), logger)
+            _write_run_info(run_cfg, args, roots)
         except SystemExit as exc:
+            # One bad folder must not abandon the fourteen behind it, and
+            # must never take the summary down with it: that is what tells
+            # the user the fleet is now half old and half new.
+            logger.warning("%s: %s", name, exc)
             skipped.append((name, " ".join(str(exc).split())))
             continue
-        print(f"\n{name}: {', '.join(roots)}")
-        # Reloaded per run: run_classify drops D-reference entries that sit
-        # under the roots it is given, in place. Sharing one object across
-        # the fleet would shrink the reference drive by drive, so every run
-        # after the first would be classified against a different D.
-        stats = run_classify(run_cfg, roots, _dref(cfg, logger), logger)
-        _write_run_info(run_cfg, args, roots)
         for root, counts in sorted(stats.items()):
             print(f"  {root}: " + ", ".join(
                 f"{k}={v:,}" for k, v in sorted(counts.items())))
-        for out in run_reports(run_cfg, roots, logger):
-            print(f"  wrote {out}")
+        try:
+            for out in run_reports(run_cfg, roots, logger):
+                print(f"  wrote {out}")
+        except SystemExit as exc:
+            logger.warning("%s: reports: %s", name, exc)
+            skipped.append((name, "classified, but its reports could not be "
+                                  f"written: {' '.join(str(exc).split())}"))
+            continue
         done.append(name)
 
     print(f"\nRe-classified {len(done)} run folder(s) against cutoff "
           f"{cutoff}.")
-    if not skipped:
-        print("Every run folder is now classified by the same rules and the "
-              "same cutoff. Next: Build the Plan.")
-        return 0
-    print("\nNOT re-classified:")
-    for name, why in skipped:
-        print(f"  {name}: {why}")
-    print("\nThose folders keep their PREVIOUS classification. A plan built "
-          "now would mix old answers with new ones, so sort these out (or "
-          "move them out of the workspace) and run this again.")
-    return 1
+    if empty:
+        print(f"Nothing to classify in {len(empty)}: "
+              f"{', '.join(sorted(empty))} (those drives held no files).")
+    if skipped:
+        print("\nNOT re-classified:")
+        for name, why in skipped:
+            print(f"  {name}: {why}")
+        print("\nThose folders keep their PREVIOUS classification. A plan "
+              "built now would mix old answers with new ones, so sort these "
+              "out (or move them out of the workspace) and run this again.")
+        return 1
+    if only:
+        print(f"\nOnly the folder(s) named with --run were touched; the rest "
+              f"of {workspace} still holds its previous classification. Do "
+              f"not build the plan until every folder has been re-classified "
+              f"against this cutoff.")
+        return 1
+    print("Every run folder is now classified by the same rules and the "
+          "same cutoff. Next: Build the Plan.")
+    return 0
 
 
 def _approved_scope(cfg):

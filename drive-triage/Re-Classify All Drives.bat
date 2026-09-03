@@ -26,12 +26,15 @@ python -m triage reclassify --config triage-config.json --workspace "C:\DEV\tria
 echo.
 if errorlevel 1 (
   echo ============================================
-  echo NOT EVERY DRIVE WAS DONE. The ones that were
-  echo missed are named above, with the reason.
+  echo NOT EVERY DRIVE WAS DONE.
   echo.
-  echo They still hold their OLD classification, so
-  echo do NOT build the plan yet - it would mix old
-  echo answers with new ones.
+  echo Read the message above. It either names each
+  echo drive that was missed and why, or says no
+  echo drive folders were found at all.
+  echo.
+  echo Any drive that was missed still holds its OLD
+  echo classification, so do NOT build the plan yet:
+  echo it would mix old answers with new ones.
   echo.
   echo No drive was read and nothing was lost.
   echo ============================================
