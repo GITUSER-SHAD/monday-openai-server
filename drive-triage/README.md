@@ -246,7 +246,7 @@ later, separately approved session.
 python -m unittest discover -s tests -v
 ```
 
-131 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
+132 tests build synthetic fixture drives (media/records/boxes/dupes/junk/
 repos), run the full pipeline, and assert classification, resume behavior
 (including torn-CSV repair), read-only behavior, cross-drive comparison and
 gap closing (including the refusal to hash a drive whose content changed),

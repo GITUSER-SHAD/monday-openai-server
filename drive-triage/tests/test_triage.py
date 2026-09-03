@@ -1985,6 +1985,30 @@ class PlanTest(unittest.TestCase):
                 plan.build(ws, self._log())
             self.assertIn("mixed-provenance", str(ctx.exception))
 
+    def test_an_empty_drives_stale_provenance_does_not_halt_the_plan(self):
+        """A drive that held no files still has a header-only classify CSV
+        and whatever run-info it was left with. re-classify skips it, so its
+        provenance goes stale - but it contributes no row, so it cannot put
+        mixed rules into the plan and must not block it."""
+        from triage import plan
+        with tempfile.TemporaryDirectory() as ws:
+            live = self._mkrun(ws, "DriveOne", [
+                {"path": "F:\\m\\a.mp4", "size": "10", "drive": "F:\\",
+                 "class": "MEDIA", "nas_tier": "fastwork",
+                 "proposed_path": "Job"}])
+            with open(os.path.join(live, "run-info.json"), "w",
+                      encoding="utf-8") as fh:
+                json.dump({"activity_cutoff_iso": "2025-03-04T00:00:00Z",
+                           "tool_version": "2.0"}, fh)
+            blank = self._mkrun(ws, "DriveEmpty", [])   # header only
+            with open(os.path.join(blank, "run-info.json"), "w",
+                      encoding="utf-8") as fh:
+                json.dump({"activity_cutoff_iso": "2019-01-01T00:00:00Z",
+                           "tool_version": "1.0"}, fh)
+            res = plan.build(ws, self._log())           # must not raise
+            self.assertEqual(len(list(read_csv_rows(res["plan_csv"],
+                                                    plan.PLAN_COLUMNS))), 1)
+
     def test_dupe_of_d_without_a_named_keeper_is_held(self):
         """keeper_sha256 on these rows is what the executor must FIND on D:,
         not a second measurement. With no keeper path there is nothing to

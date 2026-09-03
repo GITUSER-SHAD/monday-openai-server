@@ -270,11 +270,13 @@ def build(workspace, logger):
     held_bytes = 0
     hashes_by_run = {}
     volumes = {}
+    contributing = set()
     for name, run_dir in runs:
         hashes_by_run[name] = _run_hashes(run_dir)
         volumes[name] = run_volumes(run_dir)
         default_vol = " | ".join(v for _s, v in sorted(volumes[name].items()))
         for slug, row in _iter_classified(run_dir):
+            contributing.add(name)
             vol = volumes[name].get(slug, default_vol)
             cls = row["class"]
             if cls in _COPY_CLASSES:
@@ -300,11 +302,16 @@ def build(workspace, logger):
         provenance[name] = load_json(
             os.path.join(run_dir, "run-info.json")) or \
             {"note": "unrecorded (classified before provenance existed)"}
+    # Only folders that actually contribute a row can put mixed rules into
+    # the plan. A drive that held no files still has a header-only classify
+    # CSV and whatever run-info it was left with - re-classify skips it,
+    # correctly, so its provenance goes stale and means nothing.
     for field, label in (("activity_cutoff_iso", "activity cutoff"),
                          ("tool_version", "tool version")):
         seen = defaultdict(list)
         for name, info in provenance.items():
-            seen[info.get(field) or "(unrecorded)"].append(name)
+            if name in contributing:
+                seen[info.get(field) or "(unrecorded)"].append(name)
         if len(seen) > 1:
             detail = "; ".join(
                 f"{v}: {', '.join(sorted(ns))}"

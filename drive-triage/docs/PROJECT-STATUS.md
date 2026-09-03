@@ -223,7 +223,7 @@ before the execution phase.
 ## 7. Codebase facts
 
 - `drive-triage/triage/` — ~4,000 lines, Python 3.9+, stdlib only, zero deps.
-- `drive-triage/tests/test_triage.py` — 131 tests, all pass, 1 skipped as root.
+- `drive-triage/tests/test_triage.py` — 132 tests, all pass, 1 skipped as root.
 - Eleven subcommands: `enumerate`, `probe`, `inventory`, `hash`, `classify`,
   `reclassify`, `report`, `crossdrive`, `hashgaps`, `plan`, `all`. Flags are
   global.
